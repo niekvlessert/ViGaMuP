@@ -240,8 +240,14 @@ public class Game {
         this.position = position;
     }
 
-    public void setNextTrack(){
-        if (position == trackList.length-1) position = 0; else position++;
+    public boolean setNextTrack(){
+        if (position == trackList.length-1) {
+            position = 0;
+            return false;
+        } else {
+            position++;
+            return true;
+        }
     }
 
     public void setPreviousTrack(){

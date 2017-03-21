@@ -210,9 +210,15 @@ public class PlayerService extends Service {
     private void nextTrack() {
         Game game = gameCollection.getCurrentGame();
         sendBroadcast(new Intent("resetSeekBar"));
-        game.setNextTrack();
+        if (!game.setNextTrack()) {
+            gameCollection.setRandomGameWithTrackInformation();
+            Game gameNew = gameCollection.getCurrentGame();
+            setKssJava(gameNew.musicFileC);
+            setKssTrackJava(gameNew.getCurrentTrackNumber(), gameNew.getCurrentTrackLength());
+        } else {
+            setKssTrack(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+        }
         updateNotificationTitles();
-        setKssTrack(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
     }
 
     private void previousTrack() {
@@ -242,7 +248,6 @@ public class PlayerService extends Service {
         if (!kssSet) {
             gameCollection.setRandomGameWithTrackInformation();
             Game game = gameCollection.getCurrentGame();
-            Log.d(LOG_TAG, game.gameName);
             setKssJava(game.musicFileC);
             setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
             updateNotificationTitles();
