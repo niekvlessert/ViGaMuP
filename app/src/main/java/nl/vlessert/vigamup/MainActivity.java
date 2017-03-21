@@ -257,7 +257,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             MyBinder myBinder = (MyBinder) service;
             mPlayerService = myBinder.getService();
             mServiceBound = true;
-            if (!mPlayerService.initialized) mPlayerService.setGameCollection(gameCollection);
+            if (!mPlayerService.hasGameCollection) mPlayerService.setGameCollection(gameCollection);
                 else gameCollection = mPlayerService.gameCollection;
         }
     };
@@ -413,8 +413,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
         View header = getLayoutInflater().inflate(R.layout.tracklist_header, lv, false);
 
-        mPlayerService.initialized = true;
-        mPlayerService.setKss(game.musicFileC);
+        mPlayerService.setKssJava(game.musicFileC);
 
         gameCollection.setCurrentGame(position);
 
@@ -435,9 +434,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                         bufferBarProgress = 2; // 2 seconds buffered always in advance...
                         seekBarThumbProgress = 0;
                         seekBar.setProgress(0);
-                        mPlayerService.setPlayingState(true);
-                        mPlayerService.updateNotificationTitles();
-                        mPlayerService.setKssTrack(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+                        mPlayerService.setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+                        mPlayerService.togglePlaybackJava(true);
                     }
                 }).start();
             }

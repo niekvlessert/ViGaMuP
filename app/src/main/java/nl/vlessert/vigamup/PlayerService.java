@@ -21,9 +21,10 @@ public class PlayerService extends Service {
     private boolean alreadyRunning = false;
     NotificationCompat.Builder mNotificationCompatBuilder;
     Notification notification;
-    boolean playing = false;
-    boolean gameSelected = false;
-    public boolean initialized = false;
+
+    private boolean kssSet = false, kssTrackSet = false, notificationPlaying = false;
+    private boolean paused = false;
+    public boolean hasGameCollection = false;
 
     public GameCollection gameCollection;
 
@@ -114,18 +115,7 @@ public class PlayerService extends Service {
             previousTrack();
         } else if (intent.getAction().equals(Constants.ACTION.PLAY_ACTION)) {
             Log.i(LOG_TAG, "Clicked Play/Pause");
-            if (!gameSelected) {
-                gameCollection.setRandomGameWithTrackInformation();
-                Game game = gameCollection.getCurrentGame();
-                Log.d(LOG_TAG, game.gameName);
-                setKss(game.musicFileC);
-                setKssTrack(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
-                updateNotificationTitles();
-                gameSelected = true;
-            } else{
-                togglePlayback();
-            }
-            if (playing) setPlayingState(false); else setPlayingState(true);
+            togglePlaybackJava(false);
         } else if (intent.getAction().equals(Constants.ACTION.NEXT_ACTION)) {
             Log.i(LOG_TAG, "Clicked Next");
             nextTrack();
@@ -169,10 +159,10 @@ public class PlayerService extends Service {
         }
     }
 
-    public void setPlayingState(boolean playState){
+    public void setPlayingState(){
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
-        if (playState) {
+        if (!notificationPlaying) {
             mNotificationCompatBuilder.mActions.clear();
             mNotificationCompatBuilder.addAction(android.R.drawable.ic_media_previous,
                     "", ppreviousIntent)
@@ -184,8 +174,7 @@ public class PlayerService extends Service {
             notification = mNotificationCompatBuilder.build();
 
             mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
-            playing = true;
-            gameSelected = true;
+            notificationPlaying = true;
         } else {
             mNotificationCompatBuilder.mActions.clear();
             mNotificationCompatBuilder.addAction(android.R.drawable.ic_media_previous,
@@ -198,7 +187,7 @@ public class PlayerService extends Service {
             notification = mNotificationCompatBuilder.build();
 
             mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
-            playing = false;
+            notificationPlaying = false;
         }
     }
 
@@ -214,6 +203,7 @@ public class PlayerService extends Service {
     }
 
     public void setGameCollection(GameCollection gc){
+        hasGameCollection = true;
         gameCollection = gc;
     }
 
@@ -237,6 +227,33 @@ public class PlayerService extends Service {
         return gameCollection.getCurrentGame().getCurrentTrackLength();
     }
 
+    public void setKssJava(String file){
+        kssSet = true;
+        kssTrackSet = false;
+        setKss(file);
+    }
+
+    public void setKssTrackJava(int track, int length){
+        kssTrackSet = true;
+        setKssTrack(track, length);
+    }
+
+    public void togglePlaybackJava(boolean fromActivity){
+        if (!kssSet) {
+            gameCollection.setRandomGameWithTrackInformation();
+            Game game = gameCollection.getCurrentGame();
+            Log.d(LOG_TAG, game.gameName);
+            setKssJava(game.musicFileC);
+            setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+            updateNotificationTitles();
+        }
+        if (!fromActivity || paused) {
+            paused = togglePlayback();
+        }
+        setPlayingState();
+        updateNotificationTitles();
+    }
+
     private void setBufferBarProgress() {
         sendBroadcast(new Intent("setBufferBarProgress"));
     }
@@ -249,7 +266,7 @@ public class PlayerService extends Service {
     public static native void createBufferQueueAudioPlayer(int sampleRate, int samplesPerBuf);
     public static native void setKss(String file);
     public static native void setKssTrack(int track, int length);
-    public static native void togglePlayback();
+    public static native boolean togglePlayback();
     public native void setKssProgress(int progress);
 
     public native void generateTrackInformation();

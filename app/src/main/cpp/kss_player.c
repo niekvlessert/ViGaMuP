@@ -71,7 +71,7 @@ char *currentFile = "";
 int queueSecond = 0;
 int secondsPlayed = 0;
 int isPlaying = 0;
-int isPaused = 0;
+int isPaused = 1;
 int isBuffering = 0;
 int16_t *fullTrackWavebuf;
 int16_t *wavebuf;
@@ -255,13 +255,15 @@ void Java_nl_vlessert_vigamup_PlayerService_setKss(JNIEnv* env, jclass clazz, ch
 
 }
 
-void Java_nl_vlessert_vigamup_PlayerService_togglePlayback(JNIEnv* env, jclass clazz) {
+jboolean Java_nl_vlessert_vigamup_PlayerService_togglePlayback(JNIEnv* env, jclass clazz) {
     if (isPaused) {
         (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
         isPaused = 0;
+        return 0;
     } else {
         (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PAUSED);
         isPaused = 1;
+        return 1;
     }
 }
 
