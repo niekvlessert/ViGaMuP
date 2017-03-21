@@ -1,0 +1,25 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context="nl.vlessert.vigamup.MainActivity">
+    <item
+        android:id="@+id/action_settings"
+        android:orderInCategory="100"
+        android:title="@string/action_settings"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/download_music"
+        android:orderInCategory="100"
+        android:title="Download Music"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/about"
+        android:orderInCategory="100"
+        android:title="About"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/exit"
+        android:orderInCategory="100"
+        android:title="Stop service and exit"
+        app:showAsAction="never" />
+</menu>
