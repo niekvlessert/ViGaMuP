@@ -11,9 +11,13 @@ import android.graphics.BitmapFactory;
 import android.media.AudioManager;
 import android.os.Binder;
 import android.os.Build;
+import android.os.Environment;
 import android.os.IBinder;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
+
+import java.io.File;
+import java.util.ArrayList;
 
 public class PlayerService extends Service {
     private static final String LOG_TAG = "KSS PlayerService";
@@ -130,6 +134,7 @@ public class PlayerService extends Service {
 
     @Override
     public void onDestroy() {
+        shutdown();
         super.onDestroy();
         Log.i(LOG_TAG, "In onDestroy");
     }
@@ -191,6 +196,38 @@ public class PlayerService extends Service {
         }
     }
 
+    public void setPlayingStateForcePause(){
+        NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        mNotificationCompatBuilder.mActions.clear();
+        mNotificationCompatBuilder.addAction(android.R.drawable.ic_media_previous,
+                "", ppreviousIntent)
+                .addAction(android.R.drawable.ic_media_play, "",
+                        pplayIntent)
+                .addAction(android.R.drawable.ic_media_next, "",
+                        pnextIntent);
+
+        notification = mNotificationCompatBuilder.build();
+
+        mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
+        paused = true;
+    }
+
+    public void setPlayingStateForcePlay(){
+        NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        mNotificationCompatBuilder.mActions.clear();
+        mNotificationCompatBuilder.addAction(android.R.drawable.ic_media_previous,
+                "", ppreviousIntent)
+                .addAction(android.R.drawable.ic_media_pause, "",
+                        pplayIntent)
+                .addAction(android.R.drawable.ic_media_next, "",
+                        pnextIntent);
+
+        notification = mNotificationCompatBuilder.build();
+
+        mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
+        paused = false;
+    }
+
     public void updateNotificationTitles(){
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         Game game = gameCollection.getCurrentGame();
@@ -207,7 +244,19 @@ public class PlayerService extends Service {
         gameCollection = gc;
     }
 
+    public void createGameCollection(){
+        gameCollection = new GameCollection(this);
+        gameCollection.createGameCollection();
+        hasGameCollection = true;
+        Intent startIntent = new Intent();
+        startIntent.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
+        Log.d(LOG_TAG,"starting service...");
+        onStartCommand(startIntent,0,0);
+    }
+
     private void nextTrack() {
+        if (!hasGameCollection) createGameCollection();
+        Log.d("KSS","Next track called...");
         Game game = gameCollection.getCurrentGame();
         sendBroadcast(new Intent("resetSeekBar"));
         if (!game.setNextTrack()) {
@@ -222,6 +271,7 @@ public class PlayerService extends Service {
     }
 
     private void previousTrack() {
+        if (!hasGameCollection) createGameCollection();
         Game game = gameCollection.getCurrentGame();
         sendBroadcast(new Intent("resetSeekBar"));
         game.setPreviousTrack();
@@ -236,6 +286,9 @@ public class PlayerService extends Service {
     public void setKssJava(String file){
         kssSet = true;
         kssTrackSet = false;
+        notificationPlaying=true;
+        updateNotificationTitles();
+        setPlayingState();
         setKss(file);
     }
 
@@ -245,15 +298,25 @@ public class PlayerService extends Service {
     }
 
     public void togglePlaybackJava(boolean fromActivity){
+        if (!hasGameCollection) createGameCollection();
         if (!kssSet) {
             gameCollection.setRandomGameWithTrackInformation();
             Game game = gameCollection.getCurrentGame();
             setKssJava(game.musicFileC);
             setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
-            updateNotificationTitles();
         }
-        if (!fromActivity || paused) {
+        if (!kssTrackSet) {
+            Game game = gameCollection.getCurrentGame();
+            setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+            togglePlayback();
+        }
+        if (!fromActivity) {
             paused = togglePlayback();
+        } else {
+            if (paused) {
+                paused = togglePlayback();
+                notificationPlaying = false;
+            } else notificationPlaying = false;
         }
         setPlayingState();
         updateNotificationTitles();
@@ -273,6 +336,7 @@ public class PlayerService extends Service {
     public static native void setKssTrack(int track, int length);
     public static native boolean togglePlayback();
     public native void setKssProgress(int progress);
+    public native void shutdown();
 
     public native void generateTrackInformation();
 

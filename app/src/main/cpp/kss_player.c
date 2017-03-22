@@ -77,8 +77,10 @@ int16_t *fullTrackWavebuf;
 int16_t *wavebuf;
 int16_t *wavebuf2;
 int nextMessageSend = 0;
+int terminateThread = 0;
 
 pthread_mutex_t lock;
+pthread_t t1;
 
 int16_t *queueBuffer1, *queueBuffer2, *queueBuffer3;
 int queueBufferToUse = 1;
@@ -114,11 +116,40 @@ void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
     generatingAllowed = 1;
 }
 
-int queueSecondIfRequired(){
+void nextTrack(void* context){
+    TickContext *pctx = (TickContext*) context;
+    JavaVM *javaVM = pctx->javaVM;
+    JNIEnv *env;
+    jint res = (*javaVM)->GetEnv(javaVM, (void**)&env, JNI_VERSION_1_6);
+    if (res != JNI_OK) {
+        res = (*javaVM)->AttachCurrentThread(javaVM, &env, NULL);
+        __android_log_print(ANDROID_LOG_INFO, "KSS", "Attaching!!");
+        if (JNI_OK != res) {
+            __android_log_print(ANDROID_LOG_INFO, "KSS", "Failed to AttachCurrentThread, ErrorCode = %d", res);
+        }
+    }
+    jmethodID nextTrackId = (*env)->GetMethodID(env, pctx->PlayerServiceClz, "nextTrack", "()V");
+    (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, nextTrackId);
+}
+
+int checkForSilence(int16_t* queueBuffer){
+    int sum = 0;
+    for (int i = 0; i < 96000; ++i) {
+        sum |= queueBuffer[i];
+    }
+    if (sum != 0) {
+        printf("At least one array element is non-zero\n");
+        return 0;
+    }
+    return 1;
+}
+
+int queueSecondIfRequired(void* context){
     if (queueSecond && secondsPlayed<trackLength) {
         if (queueBufferToUse == 1) {
             //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
             memcpy(queueBuffer1, (int8_t *) &fullTrackWavebuf[secondsPlayed * 48000], 96000);
+            //if (checkForSilence(queueBuffer1)) nextTrack(context);
             (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, 96000);
             queueSecond = 0;
             queueBufferToUse++;
@@ -127,6 +158,7 @@ int queueSecondIfRequired(){
         if (queueBufferToUse == 2 && queueSecond != 0) {
             //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
             memcpy(queueBuffer2, (int8_t *) &fullTrackWavebuf[secondsPlayed * 48000], 96000);
+            //if (checkForSilence(queueBuffer2)) nextTrack(context);
             (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer2, 96000);
             queueSecond = 0;
             queueBufferToUse++;
@@ -135,6 +167,7 @@ int queueSecondIfRequired(){
         if (queueBufferToUse == 3 && queueSecond != 0) {
             //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
             memcpy(queueBuffer3, (int8_t *) &fullTrackWavebuf[secondsPlayed * 48000], 96000);
+            //if (checkForSilence(queueBuffer3)) nextTrack(context);
             (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer3, 96000);
             queueSecond = 0;
             queueBufferToUse = 1;
@@ -160,6 +193,8 @@ void* generateAudioThread(void* context){
     jmethodID nextTrackId = (*env)->GetMethodID(env, pctx->PlayerServiceClz, "nextTrack", "()V");
     jmethodID setBufferBarProgressId = (*env)->GetMethodID(env, pctx->PlayerServiceClz, "setBufferBarProgress", "()V");
     jmethodID setSeekBarThumbProgressId = (*env)->GetMethodID(env, pctx->PlayerServiceClz, "setSeekBarThumbProgress", "()V");
+    pthread_t id = pthread_self();
+    int a=0;
     while(1)
     {
         isBuffering = 1;
@@ -176,11 +211,11 @@ void* generateAudioThread(void* context){
             (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setBufferBarProgressId);
             secondsToGenerate--;
             if (secondsToGenerate==1) KSSPLAY_fade_start(kssplay, 1000); //todo: only fade when song loops...
-            if (queueSecondIfRequired()==1) (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
+            if (queueSecondIfRequired(context)==1) (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
             nextMessageSend = 0;
         }
         isBuffering=0;
-        if (queueSecondIfRequired()==1) (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
+        if (queueSecondIfRequired(context)==1) (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
         if (isPlaying && !nextMessageSend && secondsPlayed==trackLength && trackLength!=0) {
             __android_log_print(ANDROID_LOG_INFO, "KSS", "is playing! %d %d %d %d", isPlaying, nextMessageSend, secondsPlayed, trackLength);
             sleep (2);
@@ -191,6 +226,17 @@ void* generateAudioThread(void* context){
             nextMessageSend = 1;
         }
         usleep (500);
+        if (a==1000) {
+            __android_log_print(ANDROID_LOG_INFO, "KSS", "In thread!");
+            a=0;
+        }
+        a++;
+        if (terminateThread==1 && pthread_equal(id,t1)) {
+            __android_log_print(ANDROID_LOG_INFO, "KSS", "terminating thread");
+            pthread_join(id,NULL);
+            (*javaVM)->DetachCurrentThread(javaVM);
+            pthread_exit(100);
+        }
     }
     // auto next track when ended
     // report generation to android app
@@ -363,7 +409,6 @@ void Java_nl_vlessert_vigamup_PlayerService_createEngine(JNIEnv* env, jobject in
     g_ctx.PlayerServiceClz = (*env)->NewGlobalRef(env, clz);
     g_ctx.PlayerServiceObj = (*env)->NewGlobalRef(env, instance);
 
-    pthread_t t1;
     pthread_create(&t1,&threadAttr_,generateAudioThread,&g_ctx);
 
     /*jclass cls = (*env)->GetObjectClass(env, instance);
@@ -525,6 +570,16 @@ void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
         engineObject = NULL;
         engineEngine = NULL;
     }
+
+    free (fullTrackWavebuf);
+    free (wavebuf);
+    free (wavebuf2);
+    free (queueBuffer1);
+    free (queueBuffer2);
+    free (queueBuffer3);
+    terminateThread = 0;
+
+    pthread_mutex_destroy(&lock);
 }
 
 void investigateTrackFurther(int tracknr){

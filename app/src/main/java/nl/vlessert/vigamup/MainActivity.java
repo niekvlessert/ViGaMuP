@@ -100,7 +100,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
         setSupportActionBar(toolbar);
 
-
         mLayout = (SlidingUpPanelLayout) findViewById(R.id.sliding_layout);
         mLayout.addPanelSlideListener(new SlidingUpPanelLayout.PanelSlideListener() {
             @Override
@@ -242,6 +241,22 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         bindService(startIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
 
 
+    }
+
+    @Override
+    protected void onDestroy(){
+        try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
+        try { unregisterReceiver(mBroadcastReceiver); } catch (IllegalArgumentException iae){}
+        try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
+        super.onDestroy();
+    }
+
+    @Override
+    protected void onStop(){
+        try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
+        try { unregisterReceiver(mBroadcastReceiver); } catch (IllegalArgumentException iae){}
+        try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
+        super.onStop();
     }
 
     private ServiceConnection mServiceConnection = new ServiceConnection() {

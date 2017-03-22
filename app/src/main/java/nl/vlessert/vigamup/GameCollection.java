@@ -47,6 +47,7 @@ public class GameCollection {
     }
 
     public String getCurrentGameName(){
+        if (activeGame == 0) activeGame=1;
         return gameObjects.get(activeGame).gameName;
     }
 
