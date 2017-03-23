@@ -53,7 +53,7 @@ public class GameList extends ListFragment implements OnItemClickListener {
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 Log.d("KSS", "wow: " + id);
                 try{
-                    ((OnGameSelectedListener) getActivity()).gameClicked(position);
+                    ((OnGameSelectedListener) getActivity()).gameClicked(position, false);
                 }catch (ClassCastException cce){
 
                 }
@@ -62,6 +62,6 @@ public class GameList extends ListFragment implements OnItemClickListener {
     }
 
     public interface OnGameSelectedListener{
-        void gameClicked(int position);
+        void gameClicked(int position, boolean runFromService);
     }
 }

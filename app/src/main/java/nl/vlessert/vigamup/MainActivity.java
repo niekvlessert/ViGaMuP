@@ -210,6 +210,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         filter.addAction("setBufferBarProgress");
         filter.addAction("setSeekBarThumbProgress");
         filter.addAction("resetSeekBar");
+        filter.addAction("setSlidingUpPanelWithGame");
 
         gameCollection = new GameCollection(this);
 
@@ -221,7 +222,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                //Log.d("kSS", "action: " + intent.getAction());
                 if (intent.getAction().equals("setBufferBarProgress")) setBufferBarProgress();
                 if (intent.getAction().equals("setSeekBarThumbProgress")) setSeekBarThumbProgress();
                 //if (intent.getAction().equals("nextTrack")) nextTrack();
@@ -230,6 +230,15 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     bufferBarProgress = 2; // 2 seconds buffered always in advance...
                     seekBarThumbProgress = 0;
                     seekBar.setProgress(0);
+                }
+                if (intent.getAction().equals("setSlidingUpPanelWithGame")){
+                    Log.d(LOG_TAG, "action: " + intent.getAction());
+                    Game game = gameCollection.getCurrentGame();
+                    seekBar.setMax(game.getCurrentTrackLength());
+                    bufferBarProgress = 2; // 2 seconds buffered always in advance...
+                    seekBarThumbProgress = 0;
+                    seekBar.setProgress(0);
+                    gameClicked(game.position, true);
                 }
             }
         };
@@ -417,7 +426,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     }
 
     @Override
-    public void gameClicked(int position)
+    public void gameClicked(int position, boolean runFromService)
     {
         gameCollection.setCurrentGame(position);
         Game game = gameCollection.getCurrentGame();
@@ -430,7 +439,10 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
         View header = getLayoutInflater().inflate(R.layout.tracklist_header, lv, false);
 
-        mPlayerService.setKssJava(game.musicFileC);
+        if (!runFromService) {
+            mPlayerService.setKssJava(game.musicFileC);
+            mPlayerService.stopPlayback();
+        }
 
         gameCollection.setCurrentGame(position);
 
@@ -452,7 +464,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                         seekBarThumbProgress = 0;
                         seekBar.setProgress(0);
                         mPlayerService.setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
-                        mPlayerService.togglePlaybackJava(true);
+                        mPlayerService.startPlayback();
                     //}
                 //}).start();
             }
@@ -481,6 +493,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         trackListGameLogoView.setBackgroundColor(Color.parseColor(gameCollection.getCurrentGame().getLogoBackGroundColor()));
 
         lv.setAdapter(arrayAdapter);
+
+        mLayout.setPanelState(SlidingUpPanelLayout.PanelState.EXPANDED);
 
     }
 

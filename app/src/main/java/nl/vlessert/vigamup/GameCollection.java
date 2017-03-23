@@ -37,7 +37,7 @@ public class GameCollection {
         for (Game game : gameObjects){
             if (game.hasTrackInformationList()){
                 gameObjectsWithTrackInformation.add(game);
-                Log.d("KSS","adding: " + game.gameName + " " + game.position);
+                //Log.d("KSS","adding: " + game.gameName + " " + game.position);
             }
         }
     }

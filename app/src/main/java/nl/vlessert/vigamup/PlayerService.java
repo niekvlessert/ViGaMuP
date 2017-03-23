@@ -27,7 +27,7 @@ public class PlayerService extends Service {
     Notification notification;
 
     private boolean kssSet = false, kssTrackSet = false, notificationPlaying = false;
-    private boolean paused = false;
+    private boolean paused = true;
     public boolean hasGameCollection = false;
 
     public GameCollection gameCollection;
@@ -119,7 +119,7 @@ public class PlayerService extends Service {
             previousTrack();
         } else if (intent.getAction().equals(Constants.ACTION.PLAY_ACTION)) {
             Log.i(LOG_TAG, "Clicked Play/Pause");
-            togglePlaybackJava(false);
+            togglePlaybackJava();
         } else if (intent.getAction().equals(Constants.ACTION.NEXT_ACTION)) {
             Log.i(LOG_TAG, "Clicked Next");
             nextTrack();
@@ -164,56 +164,9 @@ public class PlayerService extends Service {
         }
     }
 
-    public void setPlayingState(){
+    public void setPlayingStatePlaying() {
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
-        if (!notificationPlaying) {
-            mNotificationCompatBuilder.mActions.clear();
-            mNotificationCompatBuilder.addAction(android.R.drawable.ic_media_previous,
-                    "", ppreviousIntent)
-                    .addAction(android.R.drawable.ic_media_pause, "",
-                            pplayIntent)
-                    .addAction(android.R.drawable.ic_media_next, "",
-                            pnextIntent);
-
-            notification = mNotificationCompatBuilder.build();
-
-            mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
-            notificationPlaying = true;
-        } else {
-            mNotificationCompatBuilder.mActions.clear();
-            mNotificationCompatBuilder.addAction(android.R.drawable.ic_media_previous,
-                    "", ppreviousIntent)
-                    .addAction(android.R.drawable.ic_media_play, "",
-                            pplayIntent)
-                    .addAction(android.R.drawable.ic_media_next, "",
-                            pnextIntent);
-
-            notification = mNotificationCompatBuilder.build();
-
-            mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
-            notificationPlaying = false;
-        }
-    }
-
-    public void setPlayingStateForcePause(){
-        NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        mNotificationCompatBuilder.mActions.clear();
-        mNotificationCompatBuilder.addAction(android.R.drawable.ic_media_previous,
-                "", ppreviousIntent)
-                .addAction(android.R.drawable.ic_media_play, "",
-                        pplayIntent)
-                .addAction(android.R.drawable.ic_media_next, "",
-                        pnextIntent);
-
-        notification = mNotificationCompatBuilder.build();
-
-        mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
-        paused = true;
-    }
-
-    public void setPlayingStateForcePlay(){
-        NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         mNotificationCompatBuilder.mActions.clear();
         mNotificationCompatBuilder.addAction(android.R.drawable.ic_media_previous,
                 "", ppreviousIntent)
@@ -225,7 +178,24 @@ public class PlayerService extends Service {
         notification = mNotificationCompatBuilder.build();
 
         mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
-        paused = false;
+        notificationPlaying = true;
+    }
+
+    public void setPlayingStatePause() {
+        NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+        mNotificationCompatBuilder.mActions.clear();
+            mNotificationCompatBuilder.addAction(android.R.drawable.ic_media_previous,
+                    "", ppreviousIntent)
+                    .addAction(android.R.drawable.ic_media_play, "",
+                            pplayIntent)
+                    .addAction(android.R.drawable.ic_media_next, "",
+                            pnextIntent);
+
+        notification = mNotificationCompatBuilder.build();
+
+        mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
+        notificationPlaying = false;
     }
 
     public void updateNotificationTitles(){
@@ -264,6 +234,7 @@ public class PlayerService extends Service {
             Game gameNew = gameCollection.getCurrentGame();
             setKssJava(gameNew.musicFileC);
             setKssTrackJava(gameNew.getCurrentTrackNumber(), gameNew.getCurrentTrackLength());
+            sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
         } else {
             setKssTrack(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
         }
@@ -286,20 +257,32 @@ public class PlayerService extends Service {
     public void setKssJava(String file){
         kssSet = true;
         kssTrackSet = false;
-        notificationPlaying=true;
         updateNotificationTitles();
-        setPlayingState();
         setKss(file);
     }
 
     public void setKssTrackJava(int track, int length){
         kssTrackSet = true;
-        notificationPlaying = false;
-        setPlayingState();
         setKssTrack(track, length);
     }
 
-    public void togglePlaybackJava(boolean fromActivity){
+    public void startPlayback(){
+        if (paused) {
+            togglePlayback();
+            setPlayingStatePlaying();
+            paused = false;
+        }
+    }
+
+    public void stopPlayback(){
+        if (!paused) {
+            togglePlayback();
+            setPlayingStatePause();
+            paused = true;
+        }
+    }
+
+    public void togglePlaybackJava(){
         if (!hasGameCollection) createGameCollection();
         if (!kssSet) {
             gameCollection.setRandomGameWithTrackInformation();
@@ -312,15 +295,9 @@ public class PlayerService extends Service {
             setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
             togglePlayback();
         }
-        if (!fromActivity) {
-            paused = togglePlayback();
-        } else {
-            if (paused) {
-                paused = togglePlayback();
-                notificationPlaying = false;
-            } else notificationPlaying = false;
-        }
-        setPlayingState();
+        paused = togglePlayback();
+        if (paused) setPlayingStatePause(); else setPlayingStatePlaying();
+        Log.d("KSS","set playing from togglePlaybackJava...: " + notificationPlaying);
         updateNotificationTitles();
     }
 
