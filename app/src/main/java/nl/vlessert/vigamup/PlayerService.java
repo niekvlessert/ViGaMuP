@@ -294,6 +294,8 @@ public class PlayerService extends Service {
 
     public void setKssTrackJava(int track, int length){
         kssTrackSet = true;
+        notificationPlaying = false;
+        setPlayingState();
         setKssTrack(track, length);
     }
 

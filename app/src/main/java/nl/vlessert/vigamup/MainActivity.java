@@ -18,6 +18,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.IBinder;
+import android.os.Process;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.content.ContextCompat;
@@ -301,9 +302,10 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 Intent stopIntent = new Intent(MainActivity.this, PlayerService.class);
                 stopIntent.setAction(Constants.ACTION.STOPFOREGROUND_ACTION);
                 startService(stopIntent);
-                unregisterReceiver(receiver);
-                unregisterReceiver(mBroadcastReceiver);
-                unbindService(mServiceConnection);
+                try {unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
+                try {unregisterReceiver(mBroadcastReceiver); } catch (IllegalArgumentException iae){}
+                try {unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
+                Process.killProcess(Process.myPid()); //force kill, works better for killing the c code with running thread (?), but not perfect
                 this.finishAffinity();
                 return true;
             default:
@@ -442,17 +444,17 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 Game game = gameCollection.getCurrentGame();
                 game.setTrack(position-1);
 
-                new Thread(new Runnable() {
-                    public void run() {
-                        Game game = gameCollection.getCurrentGame();
+                //new Thread(new Runnable() {
+                    //public void run() {
+                        //Game game = gameCollection.getCurrentGame();
                         seekBar.setMax(game.getCurrentTrackLength());
                         bufferBarProgress = 2; // 2 seconds buffered always in advance...
                         seekBarThumbProgress = 0;
                         seekBar.setProgress(0);
                         mPlayerService.setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
                         mPlayerService.togglePlaybackJava(true);
-                    }
-                }).start();
+                    //}
+                //}).start();
             }
         });
 
