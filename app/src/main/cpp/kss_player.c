@@ -226,8 +226,8 @@ void* generateAudioThread(void* context){
             nextMessageSend = 1;
         }
         usleep (500);
-        if (a==1000) {
-            __android_log_print(ANDROID_LOG_INFO, "KSS", "In thread!");
+        if (a==100000) {
+            //__android_log_print(ANDROID_LOG_INFO, "KSS", "In thread!");
             a=0;
         }
         a++;

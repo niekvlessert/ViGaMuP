@@ -81,11 +81,10 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
     private SeekBar seekBar = null;
 
+    private BroadcastReceiver receiver;
+
     PlayerService mPlayerService;
     boolean mServiceBound = false;
-
-    private BroadcastReceiver receiver;
-    private BroadcastReceiver mBroadcastReceiver;
 
     GameList gameList;
 
@@ -94,6 +93,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        BroadcastReceiver receiver;
+
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
 
@@ -138,45 +139,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
         gameLogoView = (ImageView) findViewById(R.id.logo);
 
-        downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-
-        mBroadcastReceiver = new BroadcastReceiver() {
-            public void onReceive(Context context, Intent intent) {
-                String action = intent.getAction();
-                if (DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(action)) {
-
-                    // get the DownloadManager instance
-                    DownloadManager manager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
-
-                    DownloadManager.Query q = new DownloadManager.Query();
-                    Cursor c = manager.query(q);
-
-                    if (c.moveToFirst()) {
-                        int status = c.getInt(c.getColumnIndex(DownloadManager.COLUMN_STATUS));
-                        if (status != DownloadManager.STATUS_FAILED) {
-                            String name = c.getString(c.getColumnIndex(DownloadManager.COLUMN_LOCAL_FILENAME));
-                            Log.i("DOWNLOAD LISTENER", "file name: " + name);
-                            File file = new File(name);
-                            File targetDirectory = new File(name.substring(0, name.lastIndexOf("/")));
-                            try {
-                                unzip(file, targetDirectory);
-                            } catch (IOException test) {
-                                Log.d(LOG_TAG, "Unzip error... very weird");
-                            }
-                            finish();
-                            startActivity(getIntent());
-                        } else {
-                            Log.i(LOG_TAG, "Download failed!");
-                            Toast.makeText(getApplicationContext(), "Download failed... try again", Toast.LENGTH_LONG).show();
-                        }
-                    } else {
-                        Log.i("DOWNLOAD LISTENER", "empty cursor :(");
-                    }
-                    c.close();
-                }
-            }
-        };
-
         seekBar = (SeekBar) findViewById(R.id.seekBar);
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -204,13 +166,12 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             }
         });
 
-        registerReceiver(mBroadcastReceiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
-
         IntentFilter filter = new IntentFilter();
         filter.addAction("setBufferBarProgress");
         filter.addAction("setSeekBarThumbProgress");
         filter.addAction("resetSeekBar");
         filter.addAction("setSlidingUpPanelWithGame");
+        filter.addAction(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
 
         gameCollection = new GameCollection(this);
 
@@ -224,7 +185,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             public void onReceive(Context context, Intent intent) {
                 if (intent.getAction().equals("setBufferBarProgress")) setBufferBarProgress();
                 if (intent.getAction().equals("setSeekBarThumbProgress")) setSeekBarThumbProgress();
-                //if (intent.getAction().equals("nextTrack")) nextTrack();
                 if (intent.getAction().equals("resetSeekBar")) {
                     seekBar.setMax(mPlayerService.getCurrentTrackLength());
                     bufferBarProgress = 2; // 2 seconds buffered always in advance...
@@ -240,23 +200,26 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     seekBar.setProgress(0);
                     gameClicked(game.position, true);
                 }
+                if (intent.getAction().equals(DownloadManager.ACTION_DOWNLOAD_COMPLETE)){
+                    Log.d(LOG_TAG, "Download event!!: " + intent.getAction());
+                    unpackDownloadedFile(context, intent);
+                }
             }
         };
+
         registerReceiver(receiver, filter);
+
+        downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
 
         Intent startIntent = new Intent(MainActivity.this, PlayerService.class);
         startIntent.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
-        Log.d(LOG_TAG,"starting service...");
         startService(startIntent);
         bindService(startIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
-
-
     }
 
     @Override
     protected void onDestroy(){
         try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
-        try { unregisterReceiver(mBroadcastReceiver); } catch (IllegalArgumentException iae){}
         try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
         super.onDestroy();
     }
@@ -264,7 +227,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     @Override
     protected void onStop(){
         try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
-        try { unregisterReceiver(mBroadcastReceiver); } catch (IllegalArgumentException iae){}
         try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
         super.onStop();
     }
@@ -278,7 +240,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
-            Log.d("KSS","service connected!!");
+            Log.d(LOG_TAG,"service connected!!");
             MyBinder myBinder = (MyBinder) service;
             mPlayerService = myBinder.getService();
             mServiceBound = true;
@@ -310,9 +272,9 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             case R.id.exit:
                 Intent stopIntent = new Intent(MainActivity.this, PlayerService.class);
                 stopIntent.setAction(Constants.ACTION.STOPFOREGROUND_ACTION);
+                mPlayerService.shutdown();
                 startService(stopIntent);
-                try {unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
-                try {unregisterReceiver(mBroadcastReceiver); } catch (IllegalArgumentException iae){}
+                //try {unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
                 try {unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
                 Process.killProcess(Process.myPid()); //force kill, works better for killing the c code with running thread (?), but not perfect
                 this.finishAffinity();
@@ -358,6 +320,47 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             } else Log.e(LOG_TAG, String.format(getString(R.string.barcode_error_format),
                     CommonStatusCodes.getStatusCodeString(resultCode)));
         } else super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    private void unpackDownloadedFile(Context context, Intent intent){
+        Log.d(LOG_TAG,"Download event!!!!");
+        String action = intent.getAction();
+        if (DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(action)) {
+
+            // get the DownloadManager instance
+            DownloadManager manager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+
+            DownloadManager.Query q = new DownloadManager.Query();
+            Cursor c = manager.query(q);
+
+            if (c.moveToFirst()) {
+                int status = c.getInt(c.getColumnIndex(DownloadManager.COLUMN_STATUS));
+                Log.d(LOG_TAG,"status: "+status + ", "+DownloadManager.STATUS_FAILED);
+                if (status != DownloadManager.STATUS_FAILED) {
+                    String name = c.getString(c.getColumnIndex(DownloadManager.COLUMN_LOCAL_FILENAME));
+                    Log.i("DOWNLOAD LISTENER", "file name: " + name);
+                    File file = new File(name);
+                    File targetDirectory = new File(name.substring(0, name.lastIndexOf("/")));
+                    try {
+                        unzip(file, targetDirectory);
+                    } catch (IOException test) {
+                        Log.d(LOG_TAG, "Unzip error... very weird");
+                    }
+                    //finish();
+                    //startActivity(getIntent());
+                    if (checkForMusicAndInitialize()) {
+                        gameCollection.createGameCollection();
+                        showMusicList(gameList);
+                    }
+                } else {
+                    Log.i(LOG_TAG, "Download failed!");
+                    Toast.makeText(getApplicationContext(), "Download failed... try again", Toast.LENGTH_LONG).show();
+                }
+            } else {
+                Log.i("DOWNLOAD LISTENER", "empty cursor :(");
+            }
+            c.close();
+        }
     }
 
     public static void unzip(File zipFile, File targetDirectory) throws IOException {
@@ -456,17 +459,17 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 Game game = gameCollection.getCurrentGame();
                 game.setTrack(position-1);
 
-                //new Thread(new Runnable() {
-                    //public void run() {
-                        //Game game = gameCollection.getCurrentGame();
+                new Thread(new Runnable() {
+                    public void run() {
+                        Game game = gameCollection.getCurrentGame();
                         seekBar.setMax(game.getCurrentTrackLength());
                         bufferBarProgress = 2; // 2 seconds buffered always in advance...
                         seekBarThumbProgress = 0;
                         seekBar.setProgress(0);
                         mPlayerService.setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
                         mPlayerService.startPlayback();
-                    //}
-                //}).start();
+                    }
+                }).start();
             }
         });
 
@@ -554,6 +557,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
     private void downloadMusic(){
         Log.d(LOG_TAG,"Initialize barcode scanner...");
+
+
         Intent intent = new Intent(getApplicationContext(), BarcodeCaptureActivity.class);
         startActivityForResult(intent, BARCODE_READER_REQUEST_CODE);
     }

@@ -222,6 +222,10 @@ public class Game {
         if (title!=null) return title; else return gameName.substring(0, 1).toUpperCase() + gameName.substring(1);
     }
 
+    public String getVendor(){
+        if (vendor!=null) return vendor; else return "";
+    }
+
     public int getCurrentTrackNumber(){
         //Log.d("KSS", "trackrrrkrkr: " + trackInformation.get(position).getTrackNr());
         return trackInformation.get(position).getTrackNr();
@@ -250,7 +254,13 @@ public class Game {
         }
     }
 
-    public void setPreviousTrack(){
-        if (position == 0) position = trackList.length-1; else position--;
+    public boolean setPreviousTrack(){
+        if (position == 0) {
+            position = trackList.length-1;
+            return false;
+        } else {
+            position--;
+            return true;
+        }
     }
 }

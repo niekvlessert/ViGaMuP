@@ -76,7 +76,7 @@ public class GameCollection {
     }*/
 
     public ArrayList<Game> getGameObjectsArrayList(){
-        Log.d("KSS","test vanuit getGameObjectsArrayList: " + getCurrentGameName());
+        //Log.d("KSS","test vanuit getGameObjectsArrayList: " + getCurrentGameName());
         return gameObjects;
     }
 

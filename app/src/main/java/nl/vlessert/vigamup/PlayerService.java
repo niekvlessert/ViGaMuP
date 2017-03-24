@@ -9,15 +9,16 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioManager;
+import android.media.MediaMetadata;
+import android.media.session.MediaSession;
+import android.media.session.PlaybackState;
 import android.os.Binder;
 import android.os.Build;
-import android.os.Environment;
 import android.os.IBinder;
+import android.os.SystemClock;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
-
-import java.io.File;
-import java.util.ArrayList;
+import android.widget.Toast;
 
 public class PlayerService extends Service {
     private static final String LOG_TAG = "KSS PlayerService";
@@ -35,6 +36,8 @@ public class PlayerService extends Service {
     PendingIntent ppreviousIntent;
     PendingIntent pplayIntent;
     PendingIntent pnextIntent;
+
+    MediaSession mMediaSession;
 
     static {
         System.loadLibrary("kss_player");
@@ -65,6 +68,17 @@ public class PlayerService extends Service {
                 sampleRate = Integer.parseInt(nativeParam);
                 nativeParam = myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
                 bufSize = Integer.parseInt(nativeParam);
+            }
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP){
+                if (mMediaSession == null) {
+                    Log.d("init()", "API " + Build.VERSION.SDK_INT + " greater or equals " + Build.VERSION_CODES.LOLLIPOP);
+                    Log.d("init()", "Using MediaSession API.");
+
+                    mMediaSession = new MediaSession(this, "PlayerServiceMediaSession");
+                    mMediaSession.setFlags(MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
+                    mMediaSession.setActive(true);
+                    catchMediaPlayerButtons();
+                }
             }
             createBufferQueueAudioPlayer(sampleRate, bufSize);
 
@@ -135,6 +149,9 @@ public class PlayerService extends Service {
     @Override
     public void onDestroy() {
         shutdown();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            if (mMediaSession!=null) mMediaSession.release();
+        }
         super.onDestroy();
         Log.i(LOG_TAG, "In onDestroy");
     }
@@ -239,15 +256,24 @@ public class PlayerService extends Service {
             setKssTrack(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
         }
         updateNotificationTitles();
+        updateA2DPInfo();
     }
 
     private void previousTrack() {
         if (!hasGameCollection) createGameCollection();
         Game game = gameCollection.getCurrentGame();
         sendBroadcast(new Intent("resetSeekBar"));
-        game.setPreviousTrack();
+        if (!game.setPreviousTrack()) {
+            gameCollection.setRandomGameWithTrackInformation();
+            Game gameNew = gameCollection.getCurrentGame();
+            setKssJava(gameNew.musicFileC);
+            setKssTrackJava(gameNew.getCurrentTrackNumber(), gameNew.getCurrentTrackLength());
+            sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
+        } else {
+            setKssTrack(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+        }
         updateNotificationTitles();
-        setKssTrack(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+        updateA2DPInfo();
     }
 
     public int getCurrentTrackLength(){
@@ -258,6 +284,7 @@ public class PlayerService extends Service {
         kssSet = true;
         kssTrackSet = false;
         updateNotificationTitles();
+        updateA2DPInfo();
         setKss(file);
     }
 
@@ -270,6 +297,7 @@ public class PlayerService extends Service {
         if (paused) {
             togglePlayback();
             setPlayingStatePlaying();
+            updateA2DPInfo();
             paused = false;
         }
     }
@@ -278,6 +306,7 @@ public class PlayerService extends Service {
         if (!paused) {
             togglePlayback();
             setPlayingStatePause();
+            updateA2DPInfo();
             paused = true;
         }
     }
@@ -297,8 +326,79 @@ public class PlayerService extends Service {
         }
         paused = togglePlayback();
         if (paused) setPlayingStatePause(); else setPlayingStatePlaying();
-        Log.d("KSS","set playing from togglePlaybackJava...: " + notificationPlaying);
+        Log.d("KSS","togglePlaybackJava...: " + notificationPlaying);
         updateNotificationTitles();
+        updateA2DPInfo();
+    }
+
+    private void updateA2DPInfo(){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            Game game = gameCollection.getCurrentGame();
+            MediaMetadata metadata = new MediaMetadata.Builder()
+                .putString(MediaMetadata.METADATA_KEY_TITLE, game.getCurrentTrackTitle())
+                .putString(MediaMetadata.METADATA_KEY_ARTIST, game.getVendor())
+                .putString(MediaMetadata.METADATA_KEY_ALBUM, game.getTitle())
+                .putLong(MediaMetadata.METADATA_KEY_DURATION, game.getCurrentTrackLength()*1000)
+                .putLong(MediaMetadata.METADATA_KEY_TRACK_NUMBER, game.getCurrentTrackNumber())
+                .build();
+
+            mMediaSession.setMetadata(metadata);
+            PlaybackState state = new PlaybackState.Builder()
+                    .setActions(PlaybackState.ACTION_PLAY| PlaybackState.ACTION_PLAY_PAUSE |
+                            PlaybackState.ACTION_PLAY_FROM_MEDIA_ID | PlaybackState.ACTION_PAUSE |
+                            PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS)
+                    .setState(PlaybackState.STATE_PLAYING, 1, 1.0f, SystemClock.elapsedRealtime())
+                    .build();
+
+            mMediaSession.setPlaybackState(state);
+        }
+    }
+
+    private void catchMediaPlayerButtons() {
+        //capture media events like play, stop
+        //you don't actually use these callbacks
+        //but you have to have this in order to pretend to be a media application
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            mMediaSession.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS |
+                    MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
+            mMediaSession.setCallback(new MediaSession.Callback() {
+                @Override
+                public void onPlay() {
+                    //Toast.makeText(getApplicationContext(), "Play!!", Toast.LENGTH_LONG).show();
+                    togglePlayback();
+                    setPlayingStatePlaying();
+                    super.onPlay();
+                }
+
+                @Override
+                public void onPause() {
+                    //Toast.makeText(getApplicationContext(), "Pause!!", Toast.LENGTH_LONG).show();
+                    togglePlayback();
+                    setPlayingStatePause();
+                    super.onPause();
+                }
+
+                @Override
+                public void onSkipToNext() {
+                    //Toast.makeText(getApplicationContext(), "Next!!", Toast.LENGTH_LONG).show();
+                    nextTrack();
+                    super.onSkipToNext();
+                }
+
+                @Override
+                public void onSkipToPrevious() {
+                    //Toast.makeText(getApplicationContext(), "Previous!!", Toast.LENGTH_LONG).show();
+                    previousTrack();
+                    super.onSkipToPrevious();
+                }
+
+                @Override
+                public void onStop() {
+                    //Toast.makeText(getApplicationContext(), "Stop!!", Toast.LENGTH_LONG).show();
+                    super.onStop();
+                }
+            });
+        }
     }
 
     private void setBufferBarProgress() {
