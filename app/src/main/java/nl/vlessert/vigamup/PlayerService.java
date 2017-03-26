@@ -18,9 +18,8 @@ import android.os.IBinder;
 import android.os.SystemClock;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
-import android.widget.Toast;
 
-public class PlayerService extends Service {
+public class PlayerService extends Service{
     private static final String LOG_TAG = "KSS PlayerService";
     private IBinder mBinder = new MyBinder();
     private boolean alreadyRunning = false;
@@ -38,6 +37,10 @@ public class PlayerService extends Service {
     PendingIntent pnextIntent;
 
     MediaSession mMediaSession;
+
+    private AudioFocusChangeListenerImpl mAudioFocusChangeListener;
+    private boolean mFocusGranted, mFocusChanged;
+    private boolean transientlostbefore = false;
 
     static {
         System.loadLibrary("kss_player");
@@ -64,6 +67,21 @@ public class PlayerService extends Service {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
                 AudioManager myAudioMgr = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+                mAudioFocusChangeListener = new AudioFocusChangeListenerImpl();
+                int result = myAudioMgr.requestAudioFocus(mAudioFocusChangeListener,
+                        AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+
+                switch (result) {
+                    case AudioManager.AUDIOFOCUS_REQUEST_GRANTED:
+                        mFocusGranted = true;
+                        break;
+                    case AudioManager.AUDIOFOCUS_REQUEST_FAILED:
+                        mFocusGranted = false;
+                        break;
+                }
+
+                String message = "Focus request " + (mFocusGranted ? "granted" : "failed");
+                Log.i(LOG_TAG, message);
                 String nativeParam = myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
                 sampleRate = Integer.parseInt(nativeParam);
                 nativeParam = myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
@@ -174,10 +192,47 @@ public class PlayerService extends Service {
         return true;
     }
 
-
     public class MyBinder extends Binder {
         PlayerService getService() {
             return PlayerService.this;
+        }
+    }
+
+    private class AudioFocusChangeListenerImpl implements AudioManager.OnAudioFocusChangeListener {
+
+        @Override
+        public void onAudioFocusChange(int focusChange) {
+            mFocusChanged = true;
+            Log.i(LOG_TAG, "Focus changed");
+
+            switch (focusChange) {
+                case AudioManager.AUDIOFOCUS_GAIN:
+                    Log.i(LOG_TAG, "AUDIOFOCUS_GAIN");
+                    if (!paused && transientlostbefore) {
+                        togglePlayback();
+                        transientlostbefore = false;
+                        setPlayingStatePlaying();
+                    }
+                    break;
+                case AudioManager.AUDIOFOCUS_LOSS:
+                    Log.i(LOG_TAG, "AUDIOFOCUS_LOSS");
+                    if (!paused) {
+                        togglePlayback();
+                        setPlayingStatePause();
+                    }
+                    break;
+                case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                    Log.i(LOG_TAG, "AUDIOFOCUS_LOSS_TRANSIENT");
+                    if (!paused) {
+                        togglePlayback();
+                        setPlayingStatePause();
+                    }
+                    transientlostbefore = true;
+                    break;
+                case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                    Log.i(LOG_TAG, "AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK");
+                    break;
+            }
         }
     }
 
@@ -193,6 +248,8 @@ public class PlayerService extends Service {
                         pnextIntent);
 
         notification = mNotificationCompatBuilder.build();
+
+        Log.d(LOG_TAG, "setPlayingStatePlaying");
 
         mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
         notificationPlaying = true;
@@ -210,6 +267,8 @@ public class PlayerService extends Service {
                             pnextIntent);
 
         notification = mNotificationCompatBuilder.build();
+
+        Log.d(LOG_TAG, "setPlayingStatePause");
 
         mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
         notificationPlaying = false;
@@ -248,13 +307,12 @@ public class PlayerService extends Service {
         sendBroadcast(new Intent("resetSeekBar"));
         if (!game.setNextTrack()) {
             gameCollection.setRandomGameWithTrackInformation();
-            Game gameNew = gameCollection.getCurrentGame();
-            setKssJava(gameNew.musicFileC);
-            setKssTrackJava(gameNew.getCurrentTrackNumber(), gameNew.getCurrentTrackLength());
-            sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
-        } else {
-            setKssTrack(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+            game = gameCollection.getCurrentGame();
+            Log.d(LOG_TAG, "Game in service: " + game.title + " " + game.position);
+            setKssJava(game.musicFileC);
         }
+        setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+        sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
         updateNotificationTitles();
         updateA2DPInfo();
     }
@@ -265,13 +323,12 @@ public class PlayerService extends Service {
         sendBroadcast(new Intent("resetSeekBar"));
         if (!game.setPreviousTrack()) {
             gameCollection.setRandomGameWithTrackInformation();
-            Game gameNew = gameCollection.getCurrentGame();
-            setKssJava(gameNew.musicFileC);
-            setKssTrackJava(gameNew.getCurrentTrackNumber(), gameNew.getCurrentTrackLength());
-            sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
-        } else {
-            setKssTrack(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+            game = gameCollection.getCurrentGame();
+            Log.d(LOG_TAG, "Game in service: " + game.fullTitle + game.position);
+            setKssJava(game.musicFileC);
         }
+        setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+        sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
         updateNotificationTitles();
         updateA2DPInfo();
     }

@@ -75,7 +75,7 @@ public class Game {
                 //Log.d("KSS","track: " +track);
                 if (s.hasNext()) {
                     if (trackNumber<10) title = "0"+ Integer.toString(trackNumber); else title = Integer.toString(trackNumber);
-                    title += " - "+ctx.getString(R.string.tab)+s.next(); //Log.d("KSS","title: " + title); }
+                    title += " - "+s.next(); //Log.d("KSS","title: " + title); }
                 }
                 if (s.hasNext()) length = Integer.parseInt(s.next()); //Log.d("KSS","length: " + length); }
                 if (s.hasNext()) partToSkip = Integer.parseInt(s.next()); //Log.d("KSS","partToSkip: " + partToSkip); }

@@ -3,7 +3,6 @@ package nl.vlessert.vigamup;
 import android.support.v4.app.ListFragment;
 import android.os.Bundle;
 
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -52,7 +51,7 @@ public class GameList extends ListFragment implements OnItemClickListener {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 try{
-                    ((OnGameSelectedListener) getActivity()).gameClicked(position, false);
+                    ((OnGameSelectedListener) getActivity()).gameClicked(position);
                 }catch (ClassCastException cce){
 
                 }
@@ -61,6 +60,6 @@ public class GameList extends ListFragment implements OnItemClickListener {
     }
 
     public interface OnGameSelectedListener{
-        void gameClicked(int position, boolean runFromService);
+        void gameClicked(int position);
     }
 }

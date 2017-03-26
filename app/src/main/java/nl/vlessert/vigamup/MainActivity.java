@@ -23,6 +23,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
@@ -77,11 +78,14 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     int bufferBarProgress = 0;
     int seekBarThumbProgress = 0;
 
+    String currentShowedGameTitle = "";
+
     boolean expanded = false;
 
     private SeekBar seekBar = null;
 
     private BroadcastReceiver receiver;
+    private IntentFilter filter;
 
     PlayerService mPlayerService;
     boolean mServiceBound = false;
@@ -93,7 +97,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        BroadcastReceiver receiver;
+        //BroadcastReceiver receiver;
 
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -115,12 +119,12 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
                 if (slideOffset > 0.01 && !expanded) {
                     ivLayout.setVisibility(LinearLayout.GONE);
-                    //Log.d(LOG_TAG, "hide...");
+                    Log.d(LOG_TAG, "hide...");
                     expanded = true;
                 }
                 if (slideOffset < 0.02 && expanded) {
                     ivLayout.setVisibility(LinearLayout.VISIBLE);
-                    //Log.d(LOG_TAG, "back...");
+                    Log.d(LOG_TAG, "back...");
                     expanded = false;
                 }
             }
@@ -166,19 +170,19 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             }
         });
 
-        IntentFilter filter = new IntentFilter();
-        filter.addAction("setBufferBarProgress");
-        filter.addAction("setSeekBarThumbProgress");
-        filter.addAction("resetSeekBar");
-        filter.addAction("setSlidingUpPanelWithGame");
-        filter.addAction(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-
         gameCollection = new GameCollection(this);
 
         if (checkForMusicAndInitialize()) {
             gameCollection.createGameCollection();
             showMusicList(gameList);
         }
+
+        filter = new IntentFilter();
+        filter.addAction("setBufferBarProgress");
+        filter.addAction("setSeekBarThumbProgress");
+        filter.addAction("resetSeekBar");
+        filter.addAction("setSlidingUpPanelWithGame");
+        filter.addAction(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
 
         receiver = new BroadcastReceiver() {
             @Override
@@ -192,22 +196,29 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     seekBar.setProgress(0);
                 }
                 if (intent.getAction().equals("setSlidingUpPanelWithGame")){
-                    Log.d(LOG_TAG, "action: " + intent.getAction());
+                    //Log.d(LOG_TAG, "action: " + intent.getAction());
                     Game game = gameCollection.getCurrentGame();
                     seekBar.setMax(game.getCurrentTrackLength());
                     bufferBarProgress = 2; // 2 seconds buffered always in advance...
                     seekBarThumbProgress = 0;
                     seekBar.setProgress(0);
-                    gameClicked(game.position, true);
+                    LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
+                    ivLayout.setVisibility(LinearLayout.GONE);
+                    showGame(false);
                 }
                 if (intent.getAction().equals(DownloadManager.ACTION_DOWNLOAD_COMPLETE)){
                     Log.d(LOG_TAG, "Download event!!: " + intent.getAction());
                     unpackDownloadedFile(context, intent);
                 }
+                /*if (intent.getAction().equals(TelephonyManager.ACTION_PHONE_STATE_CHANGED)){
+                    Log.d(LOG_TAG, "Phone state changed!!");
+                    mPlayerService.togglePlaybackJava();
+                }*/
             }
         };
 
         registerReceiver(receiver, filter);
+        Log.d(LOG_TAG,"create receiver!!");
 
         downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
 
@@ -218,16 +229,44 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        registerReceiver(receiver, filter);
+        if (mServiceBound) {
+            gameCollection = mPlayerService.gameCollection;
+            Game game = gameCollection.getCurrentGame();
+            seekBar.setMax(game.getCurrentTrackLength());
+            bufferBarProgress = 2; // 2 seconds buffered always in advance...
+            seekBarThumbProgress = 0;
+            seekBar.setProgress(0);
+            Log.d(LOG_TAG, "Game in onresume: " + game.title + " " + game.position);
+            if (!game.getTitle().equals(currentShowedGameTitle)) showGame(false);
+            LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
+            ViewGroup.LayoutParams params = ivLayout.getLayoutParams();
+            ivLayout.setVisibility(LinearLayout.GONE);
+            params.height = 0;
+            ivLayout.setLayoutParams(params);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){ Log.d(LOG_TAG, "error in onpause: " + iae);}
+        try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){Log.d(LOG_TAG, "error in onpause: " + iae);}
+        super.onPause();
+    }
+
+    @Override
     protected void onDestroy(){
-        try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
-        try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
+        try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){ Log.d(LOG_TAG, "error in destroy: " + iae);}
+        try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){Log.d(LOG_TAG, "error in destroy: " + iae);}
         super.onDestroy();
     }
 
     @Override
     protected void onStop(){
-        try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
-        try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
+        try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){Log.d(LOG_TAG, "error in stop: " + iae);}
+        try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){Log.d(LOG_TAG, "error in stop: " + iae);}
         super.onStop();
     }
 
@@ -245,7 +284,16 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             mPlayerService = myBinder.getService();
             mServiceBound = true;
             if (!mPlayerService.hasGameCollection) mPlayerService.setGameCollection(gameCollection);
-                else gameCollection = mPlayerService.gameCollection;
+            else {
+                gameCollection = mPlayerService.gameCollection;
+                Game game = gameCollection.getCurrentGame();
+                seekBar.setMax(game.getCurrentTrackLength());
+                bufferBarProgress = 2; // 2 seconds buffered always in advance...
+                seekBarThumbProgress = 0;
+                seekBar.setProgress(0);
+                Log.d(LOG_TAG, "Game in activity: " + game.title + " " + game.position);
+                if (!game.getTitle().equals(currentShowedGameTitle)) showGame(false);
+            }
         }
     };
 
@@ -274,8 +322,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 stopIntent.setAction(Constants.ACTION.STOPFOREGROUND_ACTION);
                 mPlayerService.shutdown();
                 startService(stopIntent);
-                //try {unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
-                try {unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
+                try {this.getApplicationContext().unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
+                try {this.getApplicationContext().unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
                 Process.killProcess(Process.myPid()); //force kill, works better for killing the c code with running thread (?), but not perfect
                 this.finishAffinity();
                 return true;
@@ -429,11 +477,15 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     }
 
     @Override
-    public void gameClicked(int position, boolean runFromService)
-    {
+    public void gameClicked(int position) {
         gameCollection.setCurrentGame(position);
+        showGame(true);
+    }
+
+    public void showGame(boolean setNewKss) {
         Game game = gameCollection.getCurrentGame();
         Log.d("KSS", "game " + game.getTitle());
+        currentShowedGameTitle = game.getTitle();
 
         gameLogoView.setImageBitmap(BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
         gameLogoView.setBackgroundColor(Color.parseColor(game.getLogoBackGroundColor()));
@@ -442,12 +494,14 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
         View header = getLayoutInflater().inflate(R.layout.tracklist_header, lv, false);
 
-        if (!runFromService) {
+        if (setNewKss && mServiceBound) {
             mPlayerService.setKssJava(game.musicFileC);
             mPlayerService.stopPlayback();
         }
-
-        gameCollection.setCurrentGame(position);
+        if (setNewKss && !mServiceBound) {
+            Toast.makeText(this, "Service iniiating... try again", Toast.LENGTH_LONG).show();
+            return;
+        }
 
         lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
