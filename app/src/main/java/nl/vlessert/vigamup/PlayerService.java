@@ -323,9 +323,6 @@ public class PlayerService extends Service{
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             PlaybackState state = new PlaybackState.Builder()
-                    .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PLAY_PAUSE |
-                            PlaybackState.ACTION_PLAY_FROM_MEDIA_ID | PlaybackState.ACTION_PAUSE |
-                            PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS)
                     .setState(PlaybackState.STATE_PLAYING, secondsPlayedFromCurrentTrack*1000, 1.0f, SystemClock.elapsedRealtime())
                     .build();
 
@@ -353,9 +350,6 @@ public class PlayerService extends Service{
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             PlaybackState state = new PlaybackState.Builder()
-                    .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PLAY_PAUSE |
-                            PlaybackState.ACTION_PLAY_FROM_MEDIA_ID | PlaybackState.ACTION_PAUSE |
-                            PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS)
                     .setState(PlaybackState.STATE_PAUSED, secondsPlayedFromCurrentTrack*1000, 1.0f, SystemClock.elapsedRealtime())
                     .build();
 
@@ -422,6 +416,16 @@ public class PlayerService extends Service{
         updateA2DPInfo();
     }
 
+    public void playCurrentTrack() {
+        Game game = gameCollection.getCurrentGame();
+        setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+        sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
+        updateNotificationTitles();
+        updateA2DPInfo();
+        setPlayingStatePlaying();
+        if (paused) paused = togglePlayback();
+    }
+
     public int getCurrentTrackLength(){
         return gameCollection.getCurrentGame().getCurrentTrackLength();
     }
@@ -474,7 +478,6 @@ public class PlayerService extends Service{
         if (paused) setPlayingStatePause(); else setPlayingStatePlaying();
         Log.d("KSS","togglePlaybackJava...: " + notificationPlaying);
         updateNotificationTitles();
-        updateA2DPInfo();
     }
 
     public void updateA2DPInfo(){
@@ -504,7 +507,6 @@ public class PlayerService extends Service{
                 public void onPlay() {
                     //Toast.makeText(getApplicationContext(), "Play!!", Toast.LENGTH_LONG).show();
                     togglePlaybackJava();
-                    setPlayingStatePlaying();
                     super.onPlay();
                 }
 
@@ -512,7 +514,6 @@ public class PlayerService extends Service{
                 public void onPause() {
                     //Toast.makeText(getApplicationContext(), "Pause!!", Toast.LENGTH_LONG).show();
                     togglePlaybackJava();
-                    setPlayingStatePause();
                     super.onPause();
                 }
 
@@ -551,6 +552,18 @@ public class PlayerService extends Service{
         Intent intent = new Intent("setSeekBarThumbProgress");
         intent.putExtra("SEEKBAR_PROGRESS_SECONDS",secondsPlayedFromCurrentTrack);
         sendBroadcast(intent);
+    }
+
+    public void setKssProgressJava(int progress){
+        secondsPlayedFromCurrentTrack = progress;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            PlaybackState state = new PlaybackState.Builder()
+                    .setState(PlaybackState.STATE_PLAYING, secondsPlayedFromCurrentTrack*1000, 1.0f, SystemClock.elapsedRealtime())
+                    .build();
+
+            mMediaSession.setPlaybackState(state);
+        }
+        setKssProgress(progress);
     }
 
     public native void createEngine();

@@ -165,7 +165,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             public void onStopTrackingTouch(SeekBar seekBar) {
                 // Notification that the user has finished a touch gesture.
                 //Log.d("KSS","seekbar onStopTrackingTouch: " + seekBar.getProgress());
-                mPlayerService.setKssProgress(seekBar.getProgress());
+                mPlayerService.setKssProgressJava(seekBar.getProgress());
                 seekBarThumbProgress = seekBar.getProgress();
             }
         });
@@ -285,6 +285,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             mServiceBound = true;
             if (!mPlayerService.hasGameCollection) mPlayerService.setGameCollection(gameCollection);
             else {
+                LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
+                ivLayout.setVisibility(LinearLayout.GONE);
                 gameCollection = mPlayerService.gameCollection;
                 Game game = gameCollection.getCurrentGame();
                 seekBar.setMax(game.getCurrentTrackLength());
@@ -499,7 +501,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             mPlayerService.stopPlayback();
         }
         if (setNewKss && !mServiceBound) {
-            Toast.makeText(this, "Service iniiating... try again", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Service initiating... try again", Toast.LENGTH_LONG).show();
             return;
         }
 
@@ -513,17 +515,16 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 Game game = gameCollection.getCurrentGame();
                 game.setTrack(position-1);
 
-                new Thread(new Runnable() {
-                    public void run() {
-                        Game game = gameCollection.getCurrentGame();
+                //new Thread(new Runnable() {
+                    //public void run() {
+                        //Game game = gameCollection.getCurrentGame();
                         seekBar.setMax(game.getCurrentTrackLength());
                         bufferBarProgress = 2; // 2 seconds buffered always in advance...
                         seekBarThumbProgress = 0;
                         seekBar.setProgress(0);
-                        mPlayerService.setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
-                        mPlayerService.startPlayback();
-                    }
-                }).start();
+                        mPlayerService.playCurrentTrack();
+                    //}
+                //}).start();
             }
         });
 
