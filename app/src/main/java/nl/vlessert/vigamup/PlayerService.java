@@ -22,6 +22,10 @@ import android.os.IBinder;
 import android.os.SystemClock;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
+import android.widget.LinearLayout;
+import android.widget.RemoteViews;
+
+import static java.security.AccessController.getContext;
 
 public class PlayerService extends Service{
     private static final String LOG_TAG = "KSS PlayerService";
@@ -48,6 +52,9 @@ public class PlayerService extends Service{
     private AudioFocusChangeListenerImpl mAudioFocusChangeListener;
     private boolean mFocusGranted, mFocusChanged;
     private boolean transientlostbefore = false;
+
+    int secondsPlayedFromCurrentTrack = 0;
+    int secondsBufferedFromCurrentTrack = 0;
 
     static {
         System.loadLibrary("kss_player");
@@ -134,9 +141,11 @@ public class PlayerService extends Service{
                     R.drawable.yngwie);
 
             mNotificationCompatBuilder = new NotificationCompat.Builder(this)
+                    //.setContent(new RemoteViews("nl.vlessert.vigamup", R.layout.activity_custom_notification) )
                     .setContentTitle("")
                     .setTicker("")
                     .setContentText("")
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                     //.setCustomBigContentView(bigView)
                     .setSmallIcon(R.drawable.yngwie)
                     .setLargeIcon(
@@ -149,6 +158,8 @@ public class PlayerService extends Service{
                             pplayIntent)
                     .addAction(android.R.drawable.ic_media_next, "",
                             pnextIntent);
+
+            //LinearLayout layout = (LinearLayout)findViewById(android.R.layout.notification_main_column);
 
                     notification = mNotificationCompatBuilder.build();
             startForeground(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE,
@@ -236,6 +247,9 @@ public class PlayerService extends Service{
     @Override
     public void onRebind(Intent intent) {
         Log.v(LOG_TAG, "in onRebind");
+        Intent seekBarIntent = new Intent("setBufferBarProgress");
+        seekBarIntent.putExtra("BUFFERBAR_PROGRESS_SECONDS",secondsBufferedFromCurrentTrack);
+        sendBroadcast(seekBarIntent);
         super.onRebind(intent);
     }
 
@@ -306,6 +320,17 @@ public class PlayerService extends Service{
 
         mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
         notificationPlaying = true;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            PlaybackState state = new PlaybackState.Builder()
+                    .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PLAY_PAUSE |
+                            PlaybackState.ACTION_PLAY_FROM_MEDIA_ID | PlaybackState.ACTION_PAUSE |
+                            PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS)
+                    .setState(PlaybackState.STATE_PLAYING, secondsPlayedFromCurrentTrack*1000, 1.0f, SystemClock.elapsedRealtime())
+                    .build();
+
+            mMediaSession.setPlaybackState(state);
+        }
     }
 
     public void setPlayingStatePause() {
@@ -325,6 +350,17 @@ public class PlayerService extends Service{
 
         mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
         notificationPlaying = false;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            PlaybackState state = new PlaybackState.Builder()
+                    .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PLAY_PAUSE |
+                            PlaybackState.ACTION_PLAY_FROM_MEDIA_ID | PlaybackState.ACTION_PAUSE |
+                            PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS)
+                    .setState(PlaybackState.STATE_PAUSED, secondsPlayedFromCurrentTrack*1000, 1.0f, SystemClock.elapsedRealtime())
+                    .build();
+
+            mMediaSession.setPlaybackState(state);
+        }
     }
 
     public void updateNotificationTitles(){
@@ -393,21 +429,22 @@ public class PlayerService extends Service{
     public void setKssJava(String file){
         kssSet = true;
         kssTrackSet = false;
-        updateNotificationTitles();
-        updateA2DPInfo();
         setKss(file);
     }
 
     public void setKssTrackJava(int track, int length){
         kssTrackSet = true;
+        secondsPlayedFromCurrentTrack = 0;
+        secondsBufferedFromCurrentTrack = 0;
         setKssTrack(track, length);
     }
 
     public void startPlayback(){
         if (paused) {
             togglePlayback();
-            setPlayingStatePlaying();
             updateA2DPInfo();
+            updateNotificationTitles();
+            setPlayingStatePlaying();
             paused = false;
         }
     }
@@ -416,7 +453,6 @@ public class PlayerService extends Service{
         if (!paused) {
             togglePlayback();
             setPlayingStatePause();
-            updateA2DPInfo();
             paused = true;
         }
     }
@@ -441,7 +477,7 @@ public class PlayerService extends Service{
         updateA2DPInfo();
     }
 
-    private void updateA2DPInfo(){
+    public void updateA2DPInfo(){
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             Game game = gameCollection.getCurrentGame();
             MediaMetadata metadata = new MediaMetadata.Builder()
@@ -453,14 +489,6 @@ public class PlayerService extends Service{
                 .build();
 
             mMediaSession.setMetadata(metadata);
-            PlaybackState state = new PlaybackState.Builder()
-                    .setActions(PlaybackState.ACTION_PLAY| PlaybackState.ACTION_PLAY_PAUSE |
-                            PlaybackState.ACTION_PLAY_FROM_MEDIA_ID | PlaybackState.ACTION_PAUSE |
-                            PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS)
-                    .setState(PlaybackState.STATE_PLAYING, 1, 1.0f, SystemClock.elapsedRealtime())
-                    .build();
-
-            mMediaSession.setPlaybackState(state);
         }
     }
 
@@ -475,7 +503,7 @@ public class PlayerService extends Service{
                 @Override
                 public void onPlay() {
                     //Toast.makeText(getApplicationContext(), "Play!!", Toast.LENGTH_LONG).show();
-                    togglePlayback();
+                    togglePlaybackJava();
                     setPlayingStatePlaying();
                     super.onPlay();
                 }
@@ -483,7 +511,7 @@ public class PlayerService extends Service{
                 @Override
                 public void onPause() {
                     //Toast.makeText(getApplicationContext(), "Pause!!", Toast.LENGTH_LONG).show();
-                    togglePlayback();
+                    togglePlaybackJava();
                     setPlayingStatePause();
                     super.onPause();
                 }
@@ -512,11 +540,17 @@ public class PlayerService extends Service{
     }
 
     private void setBufferBarProgress() {
-        sendBroadcast(new Intent("setBufferBarProgress"));
+        secondsBufferedFromCurrentTrack++;
+        Intent intent = new Intent("setBufferBarProgress");
+        intent.putExtra("BUFFERBAR_PROGRESS_SECONDS",secondsBufferedFromCurrentTrack);
+        sendBroadcast(intent);
     }
 
     private void setSeekBarThumbProgress(){
-        sendBroadcast(new Intent("setSeekBarThumbProgress"));
+        secondsPlayedFromCurrentTrack++;
+        Intent intent = new Intent("setSeekBarThumbProgress");
+        intent.putExtra("SEEKBAR_PROGRESS_SECONDS",secondsPlayedFromCurrentTrack);
+        sendBroadcast(intent);
     }
 
     public native void createEngine();

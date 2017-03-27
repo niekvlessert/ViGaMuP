@@ -103,7 +103,7 @@ public class Game {
                 return false;
             } else {
                 for (int i =0; i < trackList.length; i++){
-                    if (i<10) title = "0"+ Integer.toString(i); else title = Integer.toString(i);
+                    if (i+1<10) title = "0"+ Integer.toString(i+1); else title = Integer.toString(i+1);
                     title += " - Track " + trackList[i];
                     trackInformation.add(new GameTrack(trackList[i], title, 30, 0, true));
                 }

@@ -187,8 +187,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                if (intent.getAction().equals("setBufferBarProgress")) setBufferBarProgress();
-                if (intent.getAction().equals("setSeekBarThumbProgress")) setSeekBarThumbProgress();
+                if (intent.getAction().equals("setBufferBarProgress")) setBufferBarProgress(intent.getIntExtra("BUFFERBAR_PROGRESS_SECONDS",0));
+                if (intent.getAction().equals("setSeekBarThumbProgress")) setSeekBarThumbProgress(intent.getIntExtra("SEEKBAR_PROGRESS_SECONDS",0));
                 if (intent.getAction().equals("resetSeekBar")) {
                     seekBar.setMax(mPlayerService.getCurrentTrackLength());
                     bufferBarProgress = 2; // 2 seconds buffered always in advance...
@@ -617,13 +617,15 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         startActivityForResult(intent, BARCODE_READER_REQUEST_CODE);
     }
 
-    private void setBufferBarProgress(){
+    private void setBufferBarProgress(int bufferBarProgress){
+        this.bufferBarProgress = bufferBarProgress+2;
         //Log.d(LOG_TAG,"buffer bar should be set to " + bufferBarProgress);
-        seekBar.setSecondaryProgress(++bufferBarProgress);
+        seekBar.setSecondaryProgress(this.bufferBarProgress);
     }
 
-    private void setSeekBarThumbProgress(){
+    private void setSeekBarThumbProgress(int seekBarThumbProgress){
+        this.seekBarThumbProgress = seekBarThumbProgress;
         //Log.d(LOG_TAG,"seek bar should be set to " + seekBarThumbProgress);
-        seekBar.setProgress(++seekBarThumbProgress);
+        seekBar.setProgress(seekBarThumbProgress);
     }
 }
