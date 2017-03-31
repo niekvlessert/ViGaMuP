@@ -10,8 +10,11 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.Scanner;
@@ -65,6 +68,7 @@ public class Game {
         boolean repeatable = false;
         String tmp;
         int trackNumber = 1;
+        ArrayList<Integer> addedTracks = new ArrayList<>();
         try {
             FileInputStream is = new FileInputStream(trackInfoFile);
             BufferedReader reader = new BufferedReader(new InputStreamReader(is));
@@ -87,16 +91,33 @@ public class Game {
                 line = reader.readLine();
 
                 if (Arrays.binarySearch(trackList, track) >=0) {
-                    //Log.d("KSS", "adding track: " + track + " " + title + " ");
+                    //Log.d("KSS", "adding track: " + track + " " + title + " " + length);
                     trackInformation.add(new GameTrack(track, title, length, partToSkip, repeatable));
-                    trackNumber++;
+                    addedTracks.add(track);
                 }
+                trackNumber++;
 
                 length = 0;
                 title = null;
                 partToSkip = 0;
                 repeatable = false;
             }
+            // Messy way to add tracks which should be played according to gameinfo but are not in trackinfo...
+            List<Integer> trackListCopy = new ArrayList<>();
+            for (int index = 0; index < trackList.length; index++) {
+                trackListCopy.add(trackList[index]);
+            }
+            for (Integer trackInt:addedTracks){
+                trackListCopy.remove(trackInt);
+            }
+            for (Integer trackInt:trackListCopy){
+                //Log.d("KSS", "Skipped, so add with defaults: " + trackInt.toString());
+                if (trackNumber<10) title = "0"+ Integer.toString(trackNumber); else title = Integer.toString(trackNumber);
+                title += " - Track " +trackInt.toString(); //Log.d("KSS","title: " + title); }
+                trackInformation.add(new GameTrack(trackInt, title, 120, 0, false));
+                trackNumber++;
+            }
+            //Log.d("KSS", )
         }  catch (IOException e) {
             //Log.d("KSS","error reading "+trackInfoFile);
             if (trackList == null){

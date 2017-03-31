@@ -1,6 +1,7 @@
 package nl.vlessert.vigamup;
 
 import android.Manifest;
+import android.app.ActivityManager;
 import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -97,7 +98,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        //BroadcastReceiver receiver;
 
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -105,6 +105,12 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         setSupportActionBar(toolbar);
+
+        Log.d(LOG_TAG,"HIERRRRRRRRRR");
+        Intent startIntent = new Intent(MainActivity.this, PlayerService.class);
+        startIntent.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
+        startService(startIntent);
+        bindService(startIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
 
         mLayout = (SlidingUpPanelLayout) findViewById(R.id.sliding_layout);
         mLayout.addPanelSlideListener(new SlidingUpPanelLayout.PanelSlideListener() {
@@ -210,10 +216,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     Log.d(LOG_TAG, "Download event!!: " + intent.getAction());
                     unpackDownloadedFile(context, intent);
                 }
-                /*if (intent.getAction().equals(TelephonyManager.ACTION_PHONE_STATE_CHANGED)){
-                    Log.d(LOG_TAG, "Phone state changed!!");
-                    mPlayerService.togglePlaybackJava();
-                }*/
             }
         };
 
@@ -222,15 +224,13 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
         downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
 
-        Intent startIntent = new Intent(MainActivity.this, PlayerService.class);
-        startIntent.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
-        startService(startIntent);
-        bindService(startIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
+
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        Log.d(LOG_TAG,"onResume!!");
         registerReceiver(receiver, filter);
         if (mServiceBound) {
             gameCollection = mPlayerService.gameCollection;
@@ -251,23 +251,28 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
     @Override
     protected void onPause() {
+        super.onPause();
+        Log.d(LOG_TAG,"onPause!!");
         try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){ Log.d(LOG_TAG, "error in onpause: " + iae);}
         try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){Log.d(LOG_TAG, "error in onpause: " + iae);}
-        super.onPause();
     }
 
     @Override
     protected void onDestroy(){
-        try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){ Log.d(LOG_TAG, "error in destroy: " + iae);}
-        try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){Log.d(LOG_TAG, "error in destroy: " + iae);}
         super.onDestroy();
+        seekBar.setOnSeekBarChangeListener(null);
+        try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){ Log.d(LOG_TAG, "error in destroy: " + iae);}
+        try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){Log.d(LOG_TAG, "error in destroy: " + iae);}        //Process.killProcess(Process.myPid());
+        mServiceConnection = null;
+        Log.d(LOG_TAG,"onDestory!!: " + isMyServiceRunning(PlayerService.class));
     }
 
     @Override
     protected void onStop(){
-        try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){Log.d(LOG_TAG, "error in stop: " + iae);}
-        try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){Log.d(LOG_TAG, "error in stop: " + iae);}
         super.onStop();
+        Log.d(LOG_TAG,"onStop!!");
+        /*try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){Log.d(LOG_TAG, "error in stop: " + iae);}
+        try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){Log.d(LOG_TAG, "error in stop: " + iae);}*/
     }
 
     private ServiceConnection mServiceConnection = new ServiceConnection() {
@@ -310,24 +315,27 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.action_settings:
-                Toast.makeText(getApplicationContext(), "Item 1 Selected", Toast.LENGTH_LONG).show();
+                //Toast.makeText(getApplicationContext(), "Item 1 Selected", Toast.LENGTH_LONG).show();
                 return true;
             case R.id.download_music:
                 Toast.makeText(getApplicationContext(), "Open a ViGaMuP music collection site on some PC...", Toast.LENGTH_LONG).show();
                 downloadMusic();
                 return true;
             case R.id.about:
-                Toast.makeText(getApplicationContext(), "Item 3 Selected", Toast.LENGTH_LONG).show();
+                //Toast.makeText(getApplicationContext(), "Item 3 Selected", Toast.LENGTH_LONG).show();
+                //Process.killProcess(Process.myPid());
                 return true;
             case R.id.exit:
+                try {this.getApplicationContext().unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
                 Intent stopIntent = new Intent(MainActivity.this, PlayerService.class);
                 stopIntent.setAction(Constants.ACTION.STOPFOREGROUND_ACTION);
-                mPlayerService.shutdown();
                 startService(stopIntent);
                 try {this.getApplicationContext().unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
-                try {this.getApplicationContext().unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
-                Process.killProcess(Process.myPid()); //force kill, works better for killing the c code with running thread (?), but not perfect
-                this.finishAffinity();
+                this.finish();
+
+                //Process.killProcess(Process.myPid()); //force kill, works better for killing the c code with running thread (?), but not perfect
+                //this.finishAffinity();
+
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -370,6 +378,16 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             } else Log.e(LOG_TAG, String.format(getString(R.string.barcode_error_format),
                     CommonStatusCodes.getStatusCodeString(resultCode)));
         } else super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    private boolean isMyServiceRunning(Class<?> serviceClass) {
+        ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.getName().equals(service.service.getClassName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void unpackDownloadedFile(Context context, Intent intent){

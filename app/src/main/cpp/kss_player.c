@@ -32,8 +32,8 @@ static SLmilliHertz bqPlayerSampleRate = 0;
 
 
 // aux effect on the output mix, used by the buffer queue player
-static const SLEnvironmentalReverbSettings reverbSettings =
-        SL_I3DL2_ENVIRONMENT_PRESET_STONECORRIDOR;
+//static const SLEnvironmentalReverbSettings reverbSettings =
+  //      SL_I3DL2_ENVIRONMENT_PRESET_STONECORRIDOR;
 
 /*// URI player interfaces
 static SLObjectItf uriPlayerObject = NULL;
@@ -55,9 +55,9 @@ static SLRecordItf recorderRecord;
 static SLAndroidSimpleBufferQueueItf recorderBufferQueue;*/
 
 // pointer and size of the next player buffer to enqueue, and number of remaining buffers
-static short *nextBuffer;
-static unsigned nextSize;
-static int nextCount;
+//static short *nextBuffer;
+//static unsigned nextSize;
+//static int nextCount;
 
 KSSPLAY *kssplay;
 KSS *kss;
@@ -79,10 +79,13 @@ int16_t *wavebuf2;
 int nextMessageSend = 0;
 int terminateThread = 0;
 
+long previousSum = 0;
+
 pthread_mutex_t lock;
 pthread_t t1;
 
 int16_t *queueBuffer1, *queueBuffer2, *queueBuffer3;
+int16_t *queueBufferSilence;
 int queueBufferToUse = 1;
 
 // processing callback to handler class
@@ -133,27 +136,35 @@ void nextTrack(void* context){
 }
 
 int checkForSilence(int16_t* queueBuffer){
-    int sum = 0;
-    for (int i = 0; i < 96000; ++i) {
-        sum |= queueBuffer[i];
+    long sum = 0;
+    //_android_log_print(ANDROID_LOG_INFO, "KSS", "lukt dit nog??");
+    for (int i = 0; i < 10000; i++) {
+        sum += queueBuffer[i];
     }
-    if (sum != 0) {
-        printf("At least one array element is non-zero\n");
+    //__android_log_print(ANDROID_LOG_INFO, "KSS", "of dit??");
+
+    //sum = (sum >> 13);
+    if (sum != 0 && previousSum != sum) {
+        //__android_log_print(ANDROID_LOG_INFO, "KSS", "No silence... %ld, previous was %ld", sum, previousSum);
+        previousSum = sum;
         return 0;
     }
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Silence!!");
+    previousSum=0;
     return 1;
 }
 
-int queueSecondIfRequired(void* context){
+int queueSecondIfRequired(void *context){
     if (queueSecond && secondsPlayed<trackLength) {
         if (queueBufferToUse == 1) {
             //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
             memcpy(queueBuffer1, (int8_t *) &fullTrackWavebuf[secondsPlayed * 48000], 96000);
-            //if (checkForSilence(queueBuffer1)) nextTrack(context);
-            (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, 96000);
+            memcpy(queueBufferSilence, (int8_t *) &fullTrackWavebuf[secondsPlayed * 48000], 48000);
             queueSecond = 0;
             queueBufferToUse++;
             secondsPlayed++;
+            (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, 96000);
+            if (checkForSilence(queueBufferSilence)) nextTrack(context);
         }
         if (queueBufferToUse == 2 && queueSecond != 0) {
             //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
@@ -174,7 +185,10 @@ int queueSecondIfRequired(void* context){
             secondsPlayed++;
         }
         return 1;
-    }
+    } /*else {
+        memset(queueBuffer1,0,96000);
+        (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, 96000);
+    }*/
     return 0;
 }
 
@@ -195,6 +209,7 @@ void* generateAudioThread(void* context){
     jmethodID setSeekBarThumbProgressId = (*env)->GetMethodID(env, pctx->PlayerServiceClz, "setSeekBarThumbProgress", "()V");
     pthread_t id = pthread_self();
     int a=0;
+    int queueSecondResult=0;
     while(1)
     {
         isBuffering = 1;
@@ -211,7 +226,10 @@ void* generateAudioThread(void* context){
             (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setBufferBarProgressId);
             secondsToGenerate--;
             if (secondsToGenerate==1) KSSPLAY_fade_start(kssplay, 1000); //todo: only fade when song loops...
-            if (queueSecondIfRequired(context)==1) (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
+            queueSecondResult = queueSecondIfRequired(context);
+            //__android_log_print(ANDROID_LOG_INFO, "KSS", "result of queueSecond: %d", queueSecondResult);
+            if (queueSecondResult==1) (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
+            //if (queueSecondResult==2) nextTrack(context);
             nextMessageSend = 0;
         }
         isBuffering=0;
@@ -227,7 +245,7 @@ void* generateAudioThread(void* context){
         }
         usleep (500);
         if (a==100000) {
-            //__android_log_print(ANDROID_LOG_INFO, "KSS", "In thread!");
+            __android_log_print(ANDROID_LOG_INFO, "KSS", "In thread!");
             a=0;
         }
         a++;
@@ -294,9 +312,7 @@ void Java_nl_vlessert_vigamup_PlayerService_setKss(JNIEnv* env, jclass clazz, ch
 
         __android_log_print(ANDROID_LOG_INFO, "KSS", "FMPAC enabled: %d", kss->fmpac);
 
-        queueBuffer1 = malloc(96000);
-        queueBuffer2 = malloc(96000);
-        queueBuffer3 = malloc(96000);
+
     }
 
 }
@@ -342,9 +358,8 @@ void Java_nl_vlessert_vigamup_PlayerService_setKssTrack(JNIEnv* env, jclass claz
     secondsToGenerate = secondsToPlay;
     if (secondsToPlay==1) secondsToPlay=3;
     trackLength = secondsToPlay;
+    free(fullTrackWavebuf);
     fullTrackWavebuf = malloc(96000 * secondsToPlay);
-    wavebuf = malloc(48000 * sizeof(int16_t));
-    wavebuf2 = malloc(96000);
     KSSPLAY_calc(kssplay, wavebuf, 48000);
     KSSPLAY_calc(kssplay, wavebuf2, 48000);
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf, 96000);
@@ -418,11 +433,20 @@ void Java_nl_vlessert_vigamup_PlayerService_createEngine(JNIEnv* env, jobject in
     (*env)->CallVoidMethod(env, instance, callbackMethod);*/
 
     //pthread_join(t1,NULL);
+
+    queueBuffer1 = malloc(96000);
+    queueBuffer2 = malloc(96000);
+    queueBuffer3 = malloc(96000);
+    queueBufferSilence = malloc(48000);
+
+    wavebuf = malloc(48000 * sizeof(int16_t));
+    wavebuf2 = malloc(96000);
 }
 
 // create buffer queue audio player
 void Java_nl_vlessert_vigamup_PlayerService_createBufferQueueAudioPlayer(JNIEnv* env,
                                                                            jclass clazz, jint sampleRate, jint bufSize) {
+
     SLresult result;
     if (sampleRate >= 0 && bufSize >= 0) {
         bqPlayerSampleRate = sampleRate * 1000;
@@ -517,6 +541,10 @@ void Java_nl_vlessert_vigamup_PlayerService_createBufferQueueAudioPlayer(JNIEnv*
 // shut down the native audio system
 void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
 {
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown!!!");
+
+    //(*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_STOPPED);
+    //SLresult result = (*bqPlayerBufferQueue)->Clear(bqPlayerBufferQueue);
 
     // destroy buffer queue audio player object, and invalidate all associated interfaces
     if (bqPlayerObject != NULL) {
@@ -528,34 +556,6 @@ void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
         bqPlayerMuteSolo = NULL;
         bqPlayerVolume = NULL;
     }
-
-    // destroy file descriptor audio player object, and invalidate all associated interfaces
-    /*if (fdPlayerObject != NULL) {
-        (*fdPlayerObject)->Destroy(fdPlayerObject);
-        fdPlayerObject = NULL;
-        fdPlayerPlay = NULL;
-        fdPlayerSeek = NULL;
-        fdPlayerMuteSolo = NULL;
-        fdPlayerVolume = NULL;
-    }*/
-
-    // destroy URI audio player object, and invalidate all associated interfaces
-    /*if (uriPlayerObject != NULL) {
-        (*uriPlayerObject)->Destroy(uriPlayerObject);
-        uriPlayerObject = NULL;
-        uriPlayerPlay = NULL;
-        uriPlayerSeek = NULL;
-        uriPlayerMuteSolo = NULL;
-        uriPlayerVolume = NULL;
-    }*/
-
-    // destroy audio recorder object, and invalidate all associated interfaces
-    /*if (recorderObject != NULL) {
-        (*recorderObject)->Destroy(recorderObject);
-        recorderObject = NULL;
-        recorderRecord = NULL;
-        recorderBufferQueue = NULL;
-    }*/
 
     // destroy output mix object, and invalidate all associated interfaces
     if (outputMixObject != NULL) {
@@ -577,7 +577,11 @@ void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
     free (queueBuffer1);
     free (queueBuffer2);
     free (queueBuffer3);
-    terminateThread = 0;
+    free (queueBufferSilence);
+    terminateThread = 1;
+
+    KSSPLAY_delete(kssplay);
+    KSS_delete(kss);
 
     pthread_mutex_destroy(&lock);
 }

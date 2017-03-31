@@ -18,6 +18,7 @@ import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
 import android.os.Binder;
 import android.os.Build;
+import android.os.Debug;
 import android.os.IBinder;
 import android.os.SystemClock;
 import android.support.v4.app.NotificationCompat;
@@ -48,6 +49,7 @@ public class PlayerService extends Service{
 
     IntentFilter filter;
     BroadcastReceiver receiver;
+    Intent intent;
 
     private AudioFocusChangeListenerImpl mAudioFocusChangeListener;
     private boolean mFocusGranted, mFocusChanged;
@@ -67,10 +69,12 @@ public class PlayerService extends Service{
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.i(LOG_TAG, "Received Intent ");
+
+        //Log.i(LOG_TAG, "Received Intent ");
         if (intent==null) {
-            Log.d("KSS","Intent empty... no idea why");
-            return START_STICKY;
+            //Log.d("KSS","Intent empty... no idea why");
+            return START_NOT_STICKY;
+            //stopSelf();
         }
         if (intent.getAction().equals(Constants.ACTION.STARTFOREGROUND_ACTION) && !alreadyRunning) {
             alreadyRunning = true;
@@ -111,6 +115,8 @@ public class PlayerService extends Service{
                     mMediaSession.setActive(true);
                     catchMediaPlayerButtons();
                 }
+
+                updateA2DPPlayState(false);
             }
             createBufferQueueAudioPlayer(sampleRate, bufSize);
 
@@ -176,8 +182,11 @@ public class PlayerService extends Service{
         } else if (intent.getAction().equals(
                 Constants.ACTION.STOPFOREGROUND_ACTION)) {
             Log.i(LOG_TAG, "Received Stop Foreground Intent");
+            stopService(intent);
             stopForeground(true);
             stopSelf();
+
+            shutdown();
         }
 
         filter = new IntentFilter();
@@ -201,18 +210,7 @@ public class PlayerService extends Service{
             }
             else if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
                 Log.d(LOG_TAG, "Device connected"); //
-                if (paused){
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        PlaybackState state = new PlaybackState.Builder()
-                                .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PLAY_PAUSE |
-                                        PlaybackState.ACTION_PLAY_FROM_MEDIA_ID | PlaybackState.ACTION_PAUSE |
-                                        PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS)
-                                .setState(PlaybackState.STATE_PAUSED, 0, 1.0f)
-                                .build();
-
-                        mMediaSession.setPlaybackState(state);
-                    }
-                }
+                if (paused) updateA2DPPlayState(false);
             }
             else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 Log.d(LOG_TAG, "Done searching"); //
@@ -229,13 +227,14 @@ public class PlayerService extends Service{
 
     @Override
     public void onDestroy() {
-        shutdown();
+        super.onDestroy();
         unregisterReceiver(mReceiver);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             if (mMediaSession!=null) mMediaSession.release();
         }
-        super.onDestroy();
+        //shutdown();
         Log.i(LOG_TAG, "In onDestroy");
+        stopSelf();
     }
 
     @Override
@@ -321,13 +320,7 @@ public class PlayerService extends Service{
         mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
         notificationPlaying = true;
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            PlaybackState state = new PlaybackState.Builder()
-                    .setState(PlaybackState.STATE_PLAYING, secondsPlayedFromCurrentTrack*1000, 1.0f, SystemClock.elapsedRealtime())
-                    .build();
-
-            mMediaSession.setPlaybackState(state);
-        }
+        updateA2DPPlayState(true);
     }
 
     public void setPlayingStatePause() {
@@ -348,13 +341,7 @@ public class PlayerService extends Service{
         mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
         notificationPlaying = false;
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            PlaybackState state = new PlaybackState.Builder()
-                    .setState(PlaybackState.STATE_PAUSED, secondsPlayedFromCurrentTrack*1000, 1.0f, SystemClock.elapsedRealtime())
-                    .build();
-
-            mMediaSession.setPlaybackState(state);
-        }
+        updateA2DPPlayState(false);
     }
 
     public void updateNotificationTitles(){
@@ -385,7 +372,7 @@ public class PlayerService extends Service{
 
     private void nextTrack() {
         if (!hasGameCollection) createGameCollection();
-        Log.d("KSS","Next track called...");
+        Log.d("KSS","Next track called..." + Debug.getNativeHeapAllocatedSize() + " and " + Debug.getNativeHeapSize());
         Game game = gameCollection.getCurrentGame();
         sendBroadcast(new Intent("resetSeekBar"));
         if (!game.setNextTrack()) {
@@ -419,7 +406,7 @@ public class PlayerService extends Service{
     public void playCurrentTrack() {
         Game game = gameCollection.getCurrentGame();
         setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
-        sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
+        //sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
         updateNotificationTitles();
         updateA2DPInfo();
         setPlayingStatePlaying();
@@ -478,6 +465,8 @@ public class PlayerService extends Service{
         if (paused) setPlayingStatePause(); else setPlayingStatePlaying();
         Log.d("KSS","togglePlaybackJava...: " + notificationPlaying);
         updateNotificationTitles();
+        updateA2DPInfo();
+        if (!paused) sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
     }
 
     public void updateA2DPInfo(){
@@ -492,6 +481,30 @@ public class PlayerService extends Service{
                 .build();
 
             mMediaSession.setMetadata(metadata);
+        }
+    }
+
+    private void updateA2DPPlayState(boolean play){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            if (play) {
+                PlaybackState state = new PlaybackState.Builder()
+                        .setActions(
+                                PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PLAY_PAUSE |
+                                        PlaybackState.ACTION_PLAY_FROM_MEDIA_ID | PlaybackState.ACTION_PAUSE |
+                                        PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS)
+                        .setState(PlaybackState.STATE_PLAYING, secondsPlayedFromCurrentTrack * 1000, 1.0f, SystemClock.elapsedRealtime())
+                        .build();
+                mMediaSession.setPlaybackState(state);
+            } else {
+                PlaybackState state = new PlaybackState.Builder()
+                        .setActions(
+                                PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PLAY_PAUSE |
+                                        PlaybackState.ACTION_PLAY_FROM_MEDIA_ID | PlaybackState.ACTION_PAUSE |
+                                        PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS)
+                        .setState(PlaybackState.STATE_PAUSED, secondsPlayedFromCurrentTrack * 1000, 1.0f, 0)
+                        .build();
+                mMediaSession.setPlaybackState(state);
+            }
         }
     }
 
@@ -556,13 +569,7 @@ public class PlayerService extends Service{
 
     public void setKssProgressJava(int progress){
         secondsPlayedFromCurrentTrack = progress;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            PlaybackState state = new PlaybackState.Builder()
-                    .setState(PlaybackState.STATE_PLAYING, secondsPlayedFromCurrentTrack*1000, 1.0f, SystemClock.elapsedRealtime())
-                    .build();
-
-            mMediaSession.setPlaybackState(state);
-        }
+        updateA2DPPlayState(true);
         setKssProgress(progress);
     }
 
