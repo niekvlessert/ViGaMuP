@@ -23,10 +23,8 @@ import android.os.IBinder;
 import android.os.SystemClock;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
-import android.widget.LinearLayout;
+import android.view.View;
 import android.widget.RemoteViews;
-
-import static java.security.AccessController.getContext;
 
 public class PlayerService extends Service{
     private static final String LOG_TAG = "KSS PlayerService";
@@ -48,8 +46,8 @@ public class PlayerService extends Service{
     MediaSession mMediaSession;
 
     IntentFilter filter;
-    BroadcastReceiver receiver;
-    Intent intent;
+
+    RemoteViews views, bigViews;
 
     private AudioFocusChangeListenerImpl mAudioFocusChangeListener;
     private boolean mFocusGranted, mFocusChanged;
@@ -83,28 +81,27 @@ public class PlayerService extends Service{
             int sampleRate = 0;
             int bufSize = 0;
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                AudioManager myAudioMgr = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-                mAudioFocusChangeListener = new AudioFocusChangeListenerImpl();
-                int result = myAudioMgr.requestAudioFocus(mAudioFocusChangeListener,
-                        AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+            AudioManager myAudioMgr = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            mAudioFocusChangeListener = new AudioFocusChangeListenerImpl();
+            int result = myAudioMgr.requestAudioFocus(mAudioFocusChangeListener,
+                    AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
 
-                switch (result) {
-                    case AudioManager.AUDIOFOCUS_REQUEST_GRANTED:
-                        mFocusGranted = true;
-                        break;
-                    case AudioManager.AUDIOFOCUS_REQUEST_FAILED:
-                        mFocusGranted = false;
-                        break;
-                }
-
-                String message = "Focus request " + (mFocusGranted ? "granted" : "failed");
-                Log.i(LOG_TAG, message);
-                String nativeParam = myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
-                sampleRate = Integer.parseInt(nativeParam);
-                nativeParam = myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
-                bufSize = Integer.parseInt(nativeParam);
+            switch (result) {
+                case AudioManager.AUDIOFOCUS_REQUEST_GRANTED:
+                    mFocusGranted = true;
+                    break;
+                case AudioManager.AUDIOFOCUS_REQUEST_FAILED:
+                    mFocusGranted = false;
+                    break;
             }
+
+            String message = "Focus request " + (mFocusGranted ? "granted" : "failed");
+            Log.i(LOG_TAG, message);
+            String nativeParam = myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
+            sampleRate = Integer.parseInt(nativeParam);
+            nativeParam = myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
+            bufSize = Integer.parseInt(nativeParam);
+
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP){
                 if (mMediaSession == null) {
                     Log.d("init()", "API " + Build.VERSION.SDK_INT + " greater or equals " + Build.VERSION_CODES.LOLLIPOP);
@@ -120,56 +117,8 @@ public class PlayerService extends Service{
             }
             createBufferQueueAudioPlayer(sampleRate, bufSize);
 
-            Log.i(LOG_TAG, "Received Start Foreground Intent ");
-            Intent notificationIntent = new Intent(this, MainActivity.class);
-            notificationIntent.setAction(Constants.ACTION.MAIN_ACTION);
-            notificationIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                    | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
-                    notificationIntent, 0);
+            createNotification();
 
-            Intent previousIntent = new Intent(this, PlayerService.class);
-            previousIntent.setAction(Constants.ACTION.PREV_ACTION);
-             ppreviousIntent = PendingIntent.getService(this, 0,
-                    previousIntent, 0);
-
-            Intent playIntent = new Intent(this, PlayerService.class);
-            playIntent.setAction(Constants.ACTION.PLAY_ACTION);
-             pplayIntent = PendingIntent.getService(this, 0,
-                    playIntent, 0);
-
-            Intent nextIntent = new Intent(this, PlayerService.class);
-            nextIntent.setAction(Constants.ACTION.NEXT_ACTION);
-             pnextIntent = PendingIntent.getService(this, 0,
-                    nextIntent, 0);
-
-            Bitmap icon = BitmapFactory.decodeResource(getResources(),
-                    R.drawable.yngwie);
-
-            mNotificationCompatBuilder = new NotificationCompat.Builder(this)
-                    //.setContent(new RemoteViews("nl.vlessert.vigamup", R.layout.activity_custom_notification) )
-                    .setContentTitle("")
-                    .setTicker("")
-                    .setContentText("")
-                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                    //.setCustomBigContentView(bigView)
-                    .setSmallIcon(R.drawable.yngwie)
-                    .setLargeIcon(
-                            Bitmap.createScaledBitmap(icon, 128, 128, false))
-                    .setContentIntent(pendingIntent)
-                    .setOngoing(true)
-                    .addAction(android.R.drawable.ic_media_previous,
-                            "", ppreviousIntent)
-                    .addAction(android.R.drawable.ic_media_play, "",
-                            pplayIntent)
-                    .addAction(android.R.drawable.ic_media_next, "",
-                            pnextIntent);
-
-            //LinearLayout layout = (LinearLayout)findViewById(android.R.layout.notification_main_column);
-
-                    notification = mNotificationCompatBuilder.build();
-            startForeground(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE,
-                    notification);
         } else if (intent.getAction().equals(Constants.ACTION.PREV_ACTION)) {
             Log.i(LOG_TAG, "Clicked Previous");
             previousTrack();
@@ -302,10 +251,96 @@ public class PlayerService extends Service{
         }
     }
 
+    private void createNotification(){
+        Log.i(LOG_TAG, "Received Start Foreground Intent ");
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        notificationIntent.setAction(Constants.ACTION.MAIN_ACTION);
+
+        views = new RemoteViews(getPackageName(), R.layout.custom_notification);
+        bigViews = new RemoteViews(getPackageName(), R.layout.custom_notification_expanded);
+
+        //views.setViewVisibility(R.id.status_bar_icon, View.VISIBLE);
+        //views.setViewVisibility(R.id.status_bar_album_art, View.GONE);
+        views.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeResource(getResources(), R.drawable.default_album_art));
+        bigViews.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeResource(getResources(), R.drawable.default_album_art));
+
+        notificationIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
+                notificationIntent, 0);
+
+        Intent previousIntent = new Intent(this, PlayerService.class);
+        previousIntent.setAction(Constants.ACTION.PREV_ACTION);
+        ppreviousIntent = PendingIntent.getService(this, 0,
+                previousIntent, 0);
+
+        Intent playIntent = new Intent(this, PlayerService.class);
+        playIntent.setAction(Constants.ACTION.PLAY_ACTION);
+        pplayIntent = PendingIntent.getService(this, 0,
+                playIntent, 0);
+
+        Intent nextIntent = new Intent(this, PlayerService.class);
+        nextIntent.setAction(Constants.ACTION.NEXT_ACTION);
+        pnextIntent = PendingIntent.getService(this, 0,
+                nextIntent, 0);
+
+        views.setOnClickPendingIntent(R.id.status_bar_play, pplayIntent);
+        bigViews.setOnClickPendingIntent(R.id.status_bar_play, pplayIntent);
+
+        views.setOnClickPendingIntent(R.id.status_bar_next, pnextIntent);
+        bigViews.setOnClickPendingIntent(R.id.status_bar_next, pnextIntent);
+
+        views.setOnClickPendingIntent(R.id.status_bar_prev, ppreviousIntent);
+        bigViews.setOnClickPendingIntent(R.id.status_bar_prev, ppreviousIntent);
+
+        views.setImageViewResource(R.id.status_bar_play,
+                android.R.drawable.ic_media_play);
+        bigViews.setImageViewResource(R.id.status_bar_play,
+                android.R.drawable.ic_media_play);
+
+        views.setTextViewText(R.id.status_bar_track_name, "Song Title");
+        bigViews.setTextViewText(R.id.status_bar_track_name, "Song Title");
+
+        views.setTextViewText(R.id.status_bar_artist_name, "Artist Name");
+        bigViews.setTextViewText(R.id.status_bar_artist_name, "Artist Name");
+
+        bigViews.setTextViewText(R.id.status_bar_album_name, "Album Name");
+
+        //Bitmap icon = BitmapFactory.decodeResource(getResources(),
+                //R.drawable.default_album_art);
+
+        mNotificationCompatBuilder = new NotificationCompat.Builder(this)
+                //setContent(new RemoteViews("nl.vlessert.vigamup", R.layout.activity_custom_notification) )
+                .setContentTitle("")
+                .setTicker("")
+                .setContentText("")
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                //.setCustomBigContentView(bigView)
+                .setSmallIcon(R.drawable.default_album_art)
+                .setLargeIcon(
+                        Bitmap.createScaledBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.default_album_art), 128, 128, false))
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                .addAction(android.R.drawable.ic_media_previous,
+                        "", ppreviousIntent)
+                .addAction(android.R.drawable.ic_media_play, "",
+                        pplayIntent)
+                .addAction(android.R.drawable.ic_media_next, "",
+                        pnextIntent)
+                .setContent(views)
+                .setCustomBigContentView(bigViews);
+
+        //LinearLayout layout = (LinearLayout)findViewById(android.R.layout.notification_main_column);
+
+        notification = mNotificationCompatBuilder.build();
+        startForeground(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE,
+                notification);
+    }
+
     public void setPlayingStatePlaying() {
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
-        mNotificationCompatBuilder.mActions.clear();
+        /*mNotificationCompatBuilder.mActions.clear();
         mNotificationCompatBuilder.addAction(android.R.drawable.ic_media_previous,
                 "", ppreviousIntent)
                 .addAction(android.R.drawable.ic_media_pause, "",
@@ -313,7 +348,12 @@ public class PlayerService extends Service{
                 .addAction(android.R.drawable.ic_media_next, "",
                         pnextIntent);
 
-        notification = mNotificationCompatBuilder.build();
+        notification = mNotificationCompatBuilder.build();*/
+
+        views.setImageViewResource(R.id.status_bar_play,
+                android.R.drawable.ic_media_pause);
+        bigViews.setImageViewResource(R.id.status_bar_play,
+                android.R.drawable.ic_media_pause);
 
         Log.d(LOG_TAG, "setPlayingStatePlaying");
 
@@ -326,7 +366,7 @@ public class PlayerService extends Service{
     public void setPlayingStatePause() {
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
-        mNotificationCompatBuilder.mActions.clear();
+        /*mNotificationCompatBuilder.mActions.clear();
             mNotificationCompatBuilder.addAction(android.R.drawable.ic_media_previous,
                     "", ppreviousIntent)
                     .addAction(android.R.drawable.ic_media_play, "",
@@ -334,7 +374,12 @@ public class PlayerService extends Service{
                     .addAction(android.R.drawable.ic_media_next, "",
                             pnextIntent);
 
-        notification = mNotificationCompatBuilder.build();
+        notification = mNotificationCompatBuilder.build();*/
+
+        views.setImageViewResource(R.id.status_bar_play,
+                android.R.drawable.ic_media_play);
+        bigViews.setImageViewResource(R.id.status_bar_play,
+                android.R.drawable.ic_media_play);
 
         Log.d(LOG_TAG, "setPlayingStatePause");
 
@@ -347,11 +392,22 @@ public class PlayerService extends Service{
     public void updateNotificationTitles(){
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         Game game = gameCollection.getCurrentGame();
-        mNotificationCompatBuilder.setContentTitle(game.getCurrentTrackTitle())
+        /*mNotificationCompatBuilder.setContentTitle(game.getCurrentTrackTitle())
                 .setTicker(game.getCurrentTrackTitle())
                 .setContentText(game.getTitle())
                 .setLargeIcon(BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
-        notification = mNotificationCompatBuilder.build();
+        notification = mNotificationCompatBuilder.build();*/
+        views.setTextViewText(R.id.status_bar_track_name, game.getCurrentTrackTitle());
+        bigViews.setTextViewText(R.id.status_bar_track_name, game.getCurrentTrackTitle());
+
+        views.setTextViewText(R.id.status_bar_artist_name, game.getTitle());
+        bigViews.setTextViewText(R.id.status_bar_artist_name, game.getTitle());
+
+        bigViews.setTextViewText(R.id.status_bar_album_name, game.getVendor());
+
+        views.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
+        bigViews.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
+
         mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
     }
 

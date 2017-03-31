@@ -52,6 +52,9 @@ public class GameCollection {
     }
 
     public Game getCurrentGame(){
+        if (activeGame==0) {
+            setRandomGameWithTrackInformation();
+        }
         return gameObjects.get(activeGame);
     }
 
