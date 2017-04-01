@@ -19,11 +19,11 @@ import android.media.session.PlaybackState;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Debug;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.SystemClock;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
-import android.view.View;
 import android.widget.RemoteViews;
 
 public class PlayerService extends Service{
@@ -42,12 +42,15 @@ public class PlayerService extends Service{
     PendingIntent ppreviousIntent;
     PendingIntent pplayIntent;
     PendingIntent pnextIntent;
+    PendingIntent prepeatIntent;
 
     MediaSession mMediaSession;
 
     IntentFilter filter;
 
     RemoteViews views, bigViews;
+
+    int repeatMode = 0;
 
     private AudioFocusChangeListenerImpl mAudioFocusChangeListener;
     private boolean mFocusGranted, mFocusChanged;
@@ -128,6 +131,9 @@ public class PlayerService extends Service{
         } else if (intent.getAction().equals(Constants.ACTION.NEXT_ACTION)) {
             Log.i(LOG_TAG, "Clicked Next");
             nextTrack();
+        } else if (intent.getAction().equals(Constants.ACTION.REPEAT_ACTION)) {
+            Log.i(LOG_TAG, "Clicked Repeat");
+            repeatActivator();
         } else if (intent.getAction().equals(
                 Constants.ACTION.STOPFOREGROUND_ACTION)) {
             Log.i(LOG_TAG, "Received Stop Foreground Intent");
@@ -284,14 +290,21 @@ public class PlayerService extends Service{
         pnextIntent = PendingIntent.getService(this, 0,
                 nextIntent, 0);
 
+        Intent repeatIntent = new Intent(this, PlayerService.class);
+        repeatIntent.setAction(Constants.ACTION.REPEAT_ACTION);
+        prepeatIntent = PendingIntent.getService(this, 0,
+                repeatIntent, 0);
+
         views.setOnClickPendingIntent(R.id.status_bar_play, pplayIntent);
         bigViews.setOnClickPendingIntent(R.id.status_bar_play, pplayIntent);
 
         views.setOnClickPendingIntent(R.id.status_bar_next, pnextIntent);
         bigViews.setOnClickPendingIntent(R.id.status_bar_next, pnextIntent);
 
-        views.setOnClickPendingIntent(R.id.status_bar_prev, ppreviousIntent);
+        //views.setOnClickPendingIntent(R.id.status_bar_prev, ppreviousIntent);
         bigViews.setOnClickPendingIntent(R.id.status_bar_prev, ppreviousIntent);
+
+        bigViews.setOnClickPendingIntent(R.id.status_bar_repeat, prepeatIntent);
 
         views.setImageViewResource(R.id.status_bar_play,
                 android.R.drawable.ic_media_play);
@@ -306,16 +319,11 @@ public class PlayerService extends Service{
 
         bigViews.setTextViewText(R.id.status_bar_album_name, "Album Name");
 
-        //Bitmap icon = BitmapFactory.decodeResource(getResources(),
-                //R.drawable.default_album_art);
-
         mNotificationCompatBuilder = new NotificationCompat.Builder(this)
-                //setContent(new RemoteViews("nl.vlessert.vigamup", R.layout.activity_custom_notification) )
                 .setContentTitle("")
                 .setTicker("")
                 .setContentText("")
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                //.setCustomBigContentView(bigView)
                 .setSmallIcon(R.drawable.default_album_art)
                 .setLargeIcon(
                         Bitmap.createScaledBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.default_album_art), 128, 128, false))
@@ -327,10 +335,10 @@ public class PlayerService extends Service{
                         pplayIntent)
                 .addAction(android.R.drawable.ic_media_next, "",
                         pnextIntent)
+                .addAction(R.drawable.img_btn_repeat, "",
+                        prepeatIntent)
                 .setContent(views)
                 .setCustomBigContentView(bigViews);
-
-        //LinearLayout layout = (LinearLayout)findViewById(android.R.layout.notification_main_column);
 
         notification = mNotificationCompatBuilder.build();
         startForeground(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE,
@@ -339,16 +347,6 @@ public class PlayerService extends Service{
 
     public void setPlayingStatePlaying() {
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-
-        /*mNotificationCompatBuilder.mActions.clear();
-        mNotificationCompatBuilder.addAction(android.R.drawable.ic_media_previous,
-                "", ppreviousIntent)
-                .addAction(android.R.drawable.ic_media_pause, "",
-                        pplayIntent)
-                .addAction(android.R.drawable.ic_media_next, "",
-                        pnextIntent);
-
-        notification = mNotificationCompatBuilder.build();*/
 
         views.setImageViewResource(R.id.status_bar_play,
                 android.R.drawable.ic_media_pause);
@@ -366,16 +364,6 @@ public class PlayerService extends Service{
     public void setPlayingStatePause() {
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
-        /*mNotificationCompatBuilder.mActions.clear();
-            mNotificationCompatBuilder.addAction(android.R.drawable.ic_media_previous,
-                    "", ppreviousIntent)
-                    .addAction(android.R.drawable.ic_media_play, "",
-                            pplayIntent)
-                    .addAction(android.R.drawable.ic_media_next, "",
-                            pnextIntent);
-
-        notification = mNotificationCompatBuilder.build();*/
-
         views.setImageViewResource(R.id.status_bar_play,
                 android.R.drawable.ic_media_play);
         bigViews.setImageViewResource(R.id.status_bar_play,
@@ -392,11 +380,7 @@ public class PlayerService extends Service{
     public void updateNotificationTitles(){
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         Game game = gameCollection.getCurrentGame();
-        /*mNotificationCompatBuilder.setContentTitle(game.getCurrentTrackTitle())
-                .setTicker(game.getCurrentTrackTitle())
-                .setContentText(game.getTitle())
-                .setLargeIcon(BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
-        notification = mNotificationCompatBuilder.build();*/
+
         views.setTextViewText(R.id.status_bar_track_name, game.getCurrentTrackTitle());
         bigViews.setTextViewText(R.id.status_bar_track_name, game.getCurrentTrackTitle());
 
@@ -524,6 +508,64 @@ public class PlayerService extends Service{
         updateA2DPInfo();
         if (!paused) sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
     }
+
+    private void repeatActivator(){
+        NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        Log.d(LOG_TAG, "repeat: " + repeatMode);
+        Game game = gameCollection.getCurrentGame();
+        Handler handler = new Handler();
+        switch(repeatMode) {
+            case 0 :
+                bigViews.setImageViewResource(R.id.status_bar_repeat,
+                        R.drawable.img_btn_repeat_pressed);
+                bigViews.setTextViewText(R.id.status_bar_track_name,"Repeat mode 1 activated: loop current track");
+                repeatMode = 1;
+                mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
+                handler.postDelayed(new MyRunnable(game), 3000);
+                break;
+            case 1 :
+                repeatMode = 2;
+                bigViews.setTextViewText(R.id.status_bar_track_name,"Repeat mode 2: loop current game/collection");
+                mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
+                handler.postDelayed(new MyRunnable(game), 3000);
+                break;
+            case 2 :
+                repeatMode = 3;
+                bigViews.setImageViewResource(R.id.status_bar_repeat,
+                        R.drawable.img_btn_shuffle_pressed);
+                bigViews.setTextViewText(R.id.status_bar_track_name,"Shuffle mode 1: shuffle current game/collection");
+                mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
+                handler.postDelayed(new MyRunnable(game), 3000);
+                break;
+            case 3 :
+                repeatMode = 4;
+                bigViews.setTextViewText(R.id.status_bar_track_name,"Shuffle mode 2: shuffle in current platform");
+                mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
+                handler.postDelayed(new MyRunnable(game), 3000);
+                break;
+            case 4 :
+                repeatMode = 0;
+                bigViews.setImageViewResource(R.id.status_bar_repeat,
+                        R.drawable.img_btn_repeat);
+                mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
+                break;
+        }
+    }
+
+    private class MyRunnable implements Runnable {
+        private Game game;
+        public MyRunnable(Game game) {
+            this.game = game;
+        }
+
+        @Override
+        public void run() {
+            NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            bigViews.setTextViewText(R.id.status_bar_track_name,game.getCurrentTrackTitle());
+            mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
+        }
+    }
+
 
     public void updateA2DPInfo(){
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {

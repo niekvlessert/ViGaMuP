@@ -9,8 +9,7 @@
         android:id="@+id/status_bar_album_art"
         android:layout_width="@dimen/status_bar_album_art"
         android:layout_height="@dimen/status_bar_album_art"
-        android:background="@android:drawable/status_bar_item_app_background"
-        android:scaleType="center"/>
+        android:scaleType="center" />
 
     <LinearLayout
         android:layout_width="0dp"
@@ -39,6 +38,7 @@
         android:id="@+id/status_bar_play"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:backgroundTint="@color/black"
         android:contentDescription="@string/nofication_play"
         android:src="@android:drawable/ic_media_play" />
 
@@ -46,6 +46,7 @@
         android:id="@+id/status_bar_next"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:backgroundTint="@color/black"
         android:contentDescription="@string/nofication_next"
         android:src="@android:drawable/ic_media_next" />
 
