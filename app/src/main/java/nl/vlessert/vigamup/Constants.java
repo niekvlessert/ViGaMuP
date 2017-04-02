@@ -14,4 +14,12 @@ public class Constants {
     public interface NOTIFICATION_ID {
         public static int FOREGROUND_SERVICE = 101;
     }
+
+    public interface REPEAT_MODES {
+        public static int NORMAL_PLAYBACK = 0;
+        public static int LOOP_TRACK = 1;
+        public static int LOOP_GAME = 2;
+        public static int SHUFFLE_IN_GAME = 3;
+        public static int SHUFFLE_IN_PLATFORM = 4;
+    }
 }

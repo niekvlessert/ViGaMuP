@@ -30,7 +30,8 @@ public class Game {
     public String musicType; // KSS for now...
     public File musicFile;
     public String musicFileC;
-    public int[] trackList = null;
+    //private int[] trackList = null;
+    private ArrayList<Integer> trackList = null;
     public int position = 0;
 
     private Context ctx;
@@ -43,7 +44,8 @@ public class Game {
     public String fullTitle = null;
     private String logoBackGroundColor = null;
 
-    public ArrayList<GameTrack> trackInformation = new ArrayList<>();
+    private ArrayList<GameTrack> trackInformation = new ArrayList<>();
+    private ArrayList<GameTrack> trackInformationRandomized = new ArrayList<>();
 
     private static final int REPEAT_TIMES=2;
 
@@ -90,7 +92,7 @@ public class Game {
                 }
                 line = reader.readLine();
 
-                if (Arrays.binarySearch(trackList, track) >=0) {
+                if (Collections.binarySearch(trackList, track) >=0) {
                     //Log.d("KSS", "adding track: " + track + " " + title + " " + length);
                     trackInformation.add(new GameTrack(track, title, length, partToSkip, repeatable));
                     addedTracks.add(track);
@@ -103,10 +105,8 @@ public class Game {
                 repeatable = false;
             }
             // Messy way to add tracks which should be played according to gameinfo but are not in trackinfo...
-            List<Integer> trackListCopy = new ArrayList<>();
-            for (int index = 0; index < trackList.length; index++) {
-                trackListCopy.add(trackList[index]);
-            }
+            List<Integer> trackListCopy = new ArrayList<>(trackList);
+
             for (Integer trackInt:addedTracks){
                 trackListCopy.remove(trackInt);
             }
@@ -123,13 +123,16 @@ public class Game {
             if (trackList == null){
                 return false;
             } else {
-                for (int i =0; i < trackList.length; i++){
+                for (int i =0; i < trackList.size(); i++){
                     if (i+1<10) title = "0"+ Integer.toString(i+1); else title = Integer.toString(i+1);
-                    title += " - Track " + trackList[i];
-                    trackInformation.add(new GameTrack(trackList[i], title, 30, 0, true));
+                    title += " - Track " + trackList.get(i);
+                    trackInformation.add(new GameTrack(trackList.get(i), title, 30, 0, true));
                 }
             }
         }
+        trackInformationRandomized = new ArrayList<>(trackInformation);
+        long seed = System.nanoTime();
+        Collections.shuffle(trackInformationRandomized, new Random(seed));
         return true;
     }
 
@@ -153,9 +156,10 @@ public class Game {
                     //Log.d("KSS",type + " " + value);
                     if (type.equals("tracks_to_play")) {
                         String[] strArray = value.split(",");
-                        trackList = new int[strArray.length];
+                        //trackList = new int[strArray.length];
+                        trackList = new ArrayList<>();
                         for (int i = 0; i < strArray.length; i++) {
-                            trackList[i] = Integer.parseInt(strArray[i]);
+                            trackList.add(Integer.parseInt(strArray[i]));
                         }
                     }
                     if (type.equals("vendor")) this.vendor=value;
@@ -182,7 +186,6 @@ public class Game {
     }
 
     public boolean hasTrackInformationList(){
-        //Log.d("KSS","yoyo" + gameName + " " + trackInformation.size());
         if (trackInformation.size()==0) return false;
         return true;
     }
@@ -202,7 +205,7 @@ public class Game {
                 total = total + gt.getPlayTimeWithRepeat(2);
             }
         } else {
-            if (trackList != null) total = trackList.length * 120;
+            if (trackList != null) total = trackList.size() * 120;
         }
         //Log.d("KSS","Total playtime from "  + gameName +": " + total); //cache gamelist, so functions won't be called all the time
         return total;
@@ -226,7 +229,7 @@ public class Game {
         else return String.format("%02d:%02d", minutes, seconds);
     }
 
-    public void shuffle(){
+    /*public void shuffle(){
         int index, temp;
         Random random = new Random();
         for (int i = trackList.length - 1; i > 0; i--)
@@ -237,7 +240,7 @@ public class Game {
             trackList[i] = temp;
         }
         position=0;
-    }
+    }*/
 
     public String getTitle(){
         if (title!=null) return title; else return gameName.substring(0, 1).toUpperCase() + gameName.substring(1);
@@ -247,18 +250,23 @@ public class Game {
         if (vendor!=null) return vendor; else return "";
     }
 
-    public int getCurrentTrackNumber(){
-        //Log.d("KSS", "trackrrrkrkr: " + trackInformation.get(position).getTrackNr());
-        return trackInformation.get(position).getTrackNr();
+    public int getCurrentTrackNumber(boolean randomized){
+        /*Log.d("KSS", "trackNr randomized??: " + randomized);
+        Log.d("KSS", "non random: " + Arrays.toString(trackInformation.toArray()));
+        Log.d("KSS", "random: " + Arrays.toString(trackInformationRandomized.toArray()));*/
+        if (randomized) return trackInformationRandomized.get(position).getTrackNr();
+            else return trackInformation.get(position).getTrackNr();
     }
 
-    public int getCurrentTrackLength(){
+    public int getCurrentTrackLength(boolean randomized){
         //Log.d("KSS", "tracklength: " + trackInformation.get(position).getTrackLength());
-        return trackInformation.get(position).getPlayTimeWithRepeat(REPEAT_TIMES);
+        if (randomized) return trackInformationRandomized.get(position).getPlayTimeWithRepeat(REPEAT_TIMES);
+            else return trackInformation.get(position).getPlayTimeWithRepeat(REPEAT_TIMES);
     }
 
-    public String getCurrentTrackTitle(){
-        return trackInformation.get(position).getTrackTitle();
+    public String getCurrentTrackTitle(boolean randomized){
+        if (randomized) return trackInformationRandomized.get(position).getTrackTitle();
+            else return trackInformation.get(position).getTrackTitle();
     }
 
     public void setTrack(int position){
@@ -266,7 +274,7 @@ public class Game {
     }
 
     public boolean setNextTrack(){
-        if (position == trackList.length-1) {
+        if (position == trackList.size()-1) {
             position = 0;
             return false;
         } else {
@@ -277,11 +285,14 @@ public class Game {
 
     public boolean setPreviousTrack(){
         if (position == 0) {
-            position = trackList.length-1;
+            position = trackList.size()-1;
             return false;
         } else {
             position--;
             return true;
         }
     }
+
+    public void setFirstTrack(){ position = 0; }
+    public void setLastTrack(){ position = trackList.size()-1; }
 }

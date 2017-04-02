@@ -19,7 +19,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.IBinder;
-import android.os.Process;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.content.ContextCompat;
@@ -90,6 +89,9 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
     PlayerService mPlayerService;
     boolean mServiceBound = false;
+
+    private boolean notificationRandomizerActive = false;
+    private boolean initialized = false;
 
     GameList gameList;
 
@@ -202,15 +204,17 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     seekBar.setProgress(0);
                 }
                 if (intent.getAction().equals("setSlidingUpPanelWithGame")){
-                    //Log.d(LOG_TAG, "action: " + intent.getAction());
                     Game game = gameCollection.getCurrentGame();
-                    seekBar.setMax(game.getCurrentTrackLength());
+                    notificationRandomizerActive = intent.getBooleanExtra("RANDOMIZER", false);
+                    Log.d(LOG_TAG, "action: " + notificationRandomizerActive);
+                    seekBar.setMax(game.getCurrentTrackLength(notificationRandomizerActive));
                     bufferBarProgress = 2; // 2 seconds buffered always in advance...
                     seekBarThumbProgress = 0;
                     seekBar.setProgress(0);
                     LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
                     ivLayout.setVisibility(LinearLayout.GONE);
                     showGame(false);
+                    notificationRandomizerActive = false;
                 }
                 if (intent.getAction().equals(DownloadManager.ACTION_DOWNLOAD_COMPLETE)){
                     Log.d(LOG_TAG, "Download event!!: " + intent.getAction());
@@ -234,8 +238,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         registerReceiver(receiver, filter);
         if (mServiceBound) {
             gameCollection = mPlayerService.gameCollection;
-            Game game = gameCollection.getCurrentGame();
-            seekBar.setMax(game.getCurrentTrackLength());
+            Game game = gameCollection.getCurrentGameNonRandom();
+            seekBar.setMax(game.getCurrentTrackLength(false));
             bufferBarProgress = 2; // 2 seconds buffered always in advance...
             seekBarThumbProgress = 0;
             seekBar.setProgress(0);
@@ -293,8 +297,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
                 ivLayout.setVisibility(LinearLayout.GONE);
                 gameCollection = mPlayerService.gameCollection;
-                Game game = gameCollection.getCurrentGame();
-                seekBar.setMax(game.getCurrentTrackLength());
+                Game game = gameCollection.getCurrentGameNonRandom();
+                seekBar.setMax(game.getCurrentTrackLength(false));
                 bufferBarProgress = 2; // 2 seconds buffered always in advance...
                 seekBarThumbProgress = 0;
                 seekBar.setProgress(0);
@@ -322,8 +326,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 downloadMusic();
                 return true;
             case R.id.about:
-                //Toast.makeText(getApplicationContext(), "Item 3 Selected", Toast.LENGTH_LONG).show();
-                //Process.killProcess(Process.myPid());
                 return true;
             case R.id.exit:
                 try {this.getApplicationContext().unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
@@ -332,10 +334,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 startService(stopIntent);
                 try {this.getApplicationContext().unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
                 this.finish();
-
-                //Process.killProcess(Process.myPid()); //force kill, works better for killing the c code with running thread (?), but not perfect
-                //this.finishAffinity();
-
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -503,7 +501,9 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     }
 
     public void showGame(boolean setNewKss) {
-        Game game = gameCollection.getCurrentGame();
+        Game game;
+        if (notificationRandomizerActive) game = gameCollection.getCurrentGame();
+            else game = gameCollection.getCurrentGameNonRandom();
         Log.d("KSS", "game " + game.getTitle());
         currentShowedGameTitle = game.getTitle();
 
@@ -514,9 +514,10 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
         View header = getLayoutInflater().inflate(R.layout.tracklist_header, lv, false);
 
-        if (setNewKss && mServiceBound) {
+        if ((setNewKss && mServiceBound) || (!initialized && mServiceBound)) {
             mPlayerService.setKssJava(game.musicFileC);
             mPlayerService.stopPlayback();
+            initialized = true;
         }
         if (setNewKss && !mServiceBound) {
             Toast.makeText(this, "Service initiating... try again", Toast.LENGTH_LONG).show();
@@ -526,17 +527,18 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                //mPlayerService.currentTrackPosition = position;
                 //Log.d(LOG_TAG,"setting color on: " + lv.getChildAt(position));
                 //lv.getChildAt(position).setBackgroundColor(Color.GREEN);
                 //lv.setBackgroundColor(Color.WHITE);
-                Game game = gameCollection.getCurrentGame();
+                Game game;
+                if (notificationRandomizerActive) game = gameCollection.getCurrentGame();
+                else game = gameCollection.getCurrentGameNonRandom();
                 game.setTrack(position-1);
 
                 //new Thread(new Runnable() {
                     //public void run() {
                         //Game game = gameCollection.getCurrentGame();
-                        seekBar.setMax(game.getCurrentTrackLength());
+                        seekBar.setMax(game.getCurrentTrackLength(false));
                         bufferBarProgress = 2; // 2 seconds buffered always in advance...
                         seekBarThumbProgress = 0;
                         seekBar.setProgress(0);
@@ -565,8 +567,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
         trackListGameLogoView = (ImageView) findViewById(R.id.tracklistHeader);
 
-        trackListGameLogoView.setImageBitmap(BitmapFactory.decodeFile(gameCollection.getCurrentGame().imageFile.getAbsolutePath()));
-        trackListGameLogoView.setBackgroundColor(Color.parseColor(gameCollection.getCurrentGame().getLogoBackGroundColor()));
+        trackListGameLogoView.setImageBitmap(BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
+        trackListGameLogoView.setBackgroundColor(Color.parseColor(game.getLogoBackGroundColor()));
 
         lv.setAdapter(arrayAdapter);
 

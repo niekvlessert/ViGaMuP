@@ -6,15 +6,20 @@ import android.util.Log;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Random;
 
 public class GameCollection {
     private int activeGame = 0;
+    private boolean randomizerActive = false;
     private ArrayList<Game> gameObjects;
     private ArrayList<Game> gameObjectsWithTrackInformation;
+    private ArrayList<Game> gameObjectsWithTrackInformationRandomized;
     private Context ctx;
     private Random randomGenerator = new Random();
 
+    private final String LOG_TAG = "ViGaMuP game collection";
 
     public GameCollection(Context ctx){
         this.ctx = ctx;
@@ -40,48 +45,41 @@ public class GameCollection {
                 //Log.d("KSS","adding: " + game.gameName + " " + game.position);
             }
         }
+        Log.d(LOG_TAG, "gameObjectsWithTrackInformation size: "+ gameObjectsWithTrackInformation.size());
+
+        gameObjectsWithTrackInformationRandomized = new ArrayList<>(gameObjectsWithTrackInformation);
+        long seed = System.nanoTime();
+        Collections.shuffle(gameObjectsWithTrackInformationRandomized, new Random(seed));
+
+        /*Log.d(LOG_TAG, "non random: " + Arrays.toString(gameObjectsWithTrackInformation.toArray()));
+        Log.d(LOG_TAG, "random: " + Arrays.toString(gameObjectsWithTrackInformationRandomized.toArray()));*/
     }
+
+    public void enableRandomizer(){ randomizerActive = true; }
+    public void disableRandomizer(){ randomizerActive = false; }
 
     public void setCurrentGame(int position){
         activeGame = position;
     }
 
-    public String getCurrentGameName(){
-        if (activeGame == 0) activeGame=1;
-        return gameObjects.get(activeGame).gameName;
-    }
-
     public Game getCurrentGame(){
-        if (activeGame==0) {
-            setRandomGameWithTrackInformation();
-        }
-        return gameObjects.get(activeGame);
+        if (randomizerActive) return gameObjectsWithTrackInformationRandomized.get(activeGame); else return gameObjectsWithTrackInformation.get(activeGame);
     }
 
-    public void setRandomGameWithTrackInformation(){
-        int index  = randomGenerator.nextInt(gameObjectsWithTrackInformation.size());
-        Game game = gameObjectsWithTrackInformation.get(index);
-        //Log.d("KSS", "wtf!!! "+ gameObjectsWithTrackInformation.size() + " - " + index + " - " +game.position);
-        activeGame = game.position;
-        //Log.d("KSS","game set: " + gameObjects.get(activeGame).gameName);
+    public Game getCurrentGameNonRandom(){ return gameObjectsWithTrackInformation.get(activeGame); }
+
+    public void setNextGame(){
+        if (activeGame == gameObjectsWithTrackInformation.size()-1) activeGame = 0;
+        else activeGame++;
     }
 
-    /*public Game getNextGame(){
-
+    public void setPreviousGame(){
+        if (activeGame == 0) activeGame = gameObjectsWithTrackInformation.size()-1;
+        else activeGame--;
     }
-
-    public Game getPreviousGame(){
-
-    }
-
-    public void setRandomizerMode(int mode){
-
-    }*/
 
     public ArrayList<Game> getGameObjectsArrayList(){
         //Log.d("KSS","test vanuit getGameObjectsArrayList: " + getCurrentGameName());
         return gameObjects;
     }
-
-    //public
 }
