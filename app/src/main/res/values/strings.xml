@@ -17,6 +17,8 @@
     <string name="nofication_next">Next</string>
     <string name="nofication_play">Next</string>
 
+    <string name="player_play">Play Button</string>
+
     <string name="tab">\u0009</string>
 
     <string-array name="Games">

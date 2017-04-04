@@ -12,9 +12,11 @@ import android.content.ServiceConnection;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Point;
+import android.media.Image;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -22,6 +24,7 @@ import android.os.IBinder;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.content.ContextCompat;
+import android.text.Html;
 import android.util.Log;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -149,7 +152,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             }
         });
 
-        gameLogoView = (ImageView) findViewById(R.id.logo);
+        //gameLogoView = (ImageView) findViewById(R.id.logo);
 
         seekBar = (SeekBar) findViewById(R.id.seekBar);
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -227,8 +230,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         Log.d(LOG_TAG,"create receiver!!");
 
         downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-
-
     }
 
     @Override
@@ -239,17 +240,19 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         if (mServiceBound) {
             gameCollection = mPlayerService.gameCollection;
             Game game = gameCollection.getCurrentGameNonRandom();
+            TextView tv = (TextView) findViewById(R.id.playerTopLayoutName);
+            tv.setText(Html.fromHtml("<b>"+game.getTitle()+"</b><br/>"+game.getCurrentTrackTitle(mPlayerService.getRandomStatus())));
             seekBar.setMax(game.getCurrentTrackLength(false));
             bufferBarProgress = 2; // 2 seconds buffered always in advance...
             seekBarThumbProgress = 0;
             seekBar.setProgress(0);
             Log.d(LOG_TAG, "Game in onresume: " + game.title + " " + game.position);
             if (!game.getTitle().equals(currentShowedGameTitle)) showGame(false);
-            LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
-            ViewGroup.LayoutParams params = ivLayout.getLayoutParams();
-            ivLayout.setVisibility(LinearLayout.GONE);
-            params.height = 0;
-            ivLayout.setLayoutParams(params);
+            //LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
+            //ViewGroup.LayoutParams params = ivLayout.getLayoutParams();
+            //ivLayout.setVisibility(LinearLayout.GONE);
+            //params.height = 0;
+            //ivLayout.setLayoutParams(params);
         }
     }
 
@@ -297,7 +300,9 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
                 ivLayout.setVisibility(LinearLayout.GONE);
                 gameCollection = mPlayerService.gameCollection;
-                Game game = gameCollection.getCurrentGameNonRandom();
+                Game game;
+                if (mPlayerService.getRandomStatus()) game = gameCollection.getCurrentGame();
+                    else game = gameCollection.getCurrentGameNonRandom();
                 seekBar.setMax(game.getCurrentTrackLength(false));
                 bufferBarProgress = 2; // 2 seconds buffered always in advance...
                 seekBarThumbProgress = 0;
@@ -376,6 +381,12 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             } else Log.e(LOG_TAG, String.format(getString(R.string.barcode_error_format),
                     CommonStatusCodes.getStatusCodeString(resultCode)));
         } else super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (mLayout.getPanelState()==SlidingUpPanelLayout.PanelState.EXPANDED) mLayout.setPanelState(SlidingUpPanelLayout.PanelState.COLLAPSED);
+            else moveTaskToBack(true);
     }
 
     private boolean isMyServiceRunning(Class<?> serviceClass) {
@@ -507,12 +518,36 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         Log.d("KSS", "game " + game.getTitle());
         currentShowedGameTitle = game.getTitle();
 
-        gameLogoView.setImageBitmap(BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
-        gameLogoView.setBackgroundColor(Color.parseColor(game.getLogoBackGroundColor()));
+        TextView tv = (TextView) findViewById(R.id.playerTopLayoutName);
+        tv.setText(Html.fromHtml("<b>"+game.getTitle()+"</b><br/>"+game.getCurrentTrackTitle(mPlayerService.getRandomStatus())));
+
+        View header, header2;
+        boolean gameLogoImageFound = true;
+        BufferedInputStream buffer;
+
+        header = getLayoutInflater().inflate(R.layout.tracklist_header, lv, false);
+        trackListGameLogoView = (ImageView) header.findViewById(R.id.tracklistHeader);
+
+        try {
+            buffer = new BufferedInputStream(new FileInputStream(game.imageFile.getAbsolutePath()));
+            Bitmap bitmap = BitmapFactory.decodeStream(buffer);
+            trackListGameLogoView.setImageBitmap(bitmap);
+            trackListGameLogoView.setBackgroundColor(Color.parseColor(game.getLogoBackGroundColor()));
+            //gameLogoView.setImageBitmap(bitmap);
+            //gameLogoView.setBackgroundColor(Color.parseColor(game.getLogoBackGroundColor()));
+            Log.d(LOG_TAG, "load image file...");
+            Log.d(LOG_TAG, "url: " + game.imageFile.getAbsolutePath());
+        } catch (java.io.FileNotFoundException e) {
+            gameLogoImageFound = false;
+            Log.d(LOG_TAG, "load failed!!");
+        }
+
+
+        header2 = getLayoutInflater().inflate(R.layout.tracklist_textview_header, lv, false);
+        TextView tv2 = (TextView) header2.findViewById(R.id.textView1);
+        tv2.setText(game.getTitle());
 
         lv = (ListView) findViewById(R.id.list);
-
-        View header = getLayoutInflater().inflate(R.layout.tracklist_header, lv, false);
 
         if ((setNewKss && mServiceBound) || (!initialized && mServiceBound)) {
             mPlayerService.setKssJava(game.musicFileC);
@@ -560,15 +595,25 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 android.R.layout.simple_list_item_1,
                 your_array_list );
 
-        if (!headerAddedBefore) {
-            lv.addHeaderView(header, null, false);
-            headerAddedBefore = true;
+        if (headerAddedBefore) {
+            View view = lv.getAdapter().getView(0, null, lv);
+            if (view instanceof LinearLayout || view instanceof ImageView){
+                if (gameLogoImageFound ) {
+                    lv.removeHeaderView(view);
+                    lv.addHeaderView(header, null, false);
+                }
+            }
+            if (view instanceof ImageView && !gameLogoImageFound){
+                lv.removeHeaderView(view);
+                lv.addHeaderView(header2, null, false);
+            }
         }
 
-        trackListGameLogoView = (ImageView) findViewById(R.id.tracklistHeader);
-
-        trackListGameLogoView.setImageBitmap(BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
-        trackListGameLogoView.setBackgroundColor(Color.parseColor(game.getLogoBackGroundColor()));
+        if (!headerAddedBefore) {
+            if (!gameLogoImageFound) lv.addHeaderView(header2, null, false);
+                else lv.addHeaderView(header, null, false);
+            headerAddedBefore = true;
+        }
 
         lv.setAdapter(arrayAdapter);
 

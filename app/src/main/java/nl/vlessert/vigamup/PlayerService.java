@@ -549,7 +549,7 @@ public class PlayerService extends Service{
         if (!kssTrackSet) {
             Game game = gameCollection.getCurrentGame();
             setKssTrackJava(game.getCurrentTrackNumber(randomizer), game.getCurrentTrackLength(randomizer));
-            togglePlayback();
+            //togglePlayback();
         }
     }
 
@@ -733,6 +733,8 @@ public class PlayerService extends Service{
         updateA2DPPlayState(true);
         setKssProgress(progress);
     }
+
+    public boolean getRandomStatus(){ return randomizer; }
 
     public native void createEngine();
     public static native void createBufferQueueAudioPlayer(int sampleRate, int samplesPerBuf);

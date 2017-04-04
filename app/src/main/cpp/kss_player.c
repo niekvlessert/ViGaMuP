@@ -164,7 +164,7 @@ int queueSecondIfRequired(void *context){
             queueBufferToUse++;
             secondsPlayed++;
             (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, 96000);
-            if (checkForSilence(queueBufferSilence)) nextTrack(context);
+            if (checkForSilence(queueBufferSilence)) secondsPlayed=trackLength; // force next Track...
         }
         if (queueBufferToUse == 2 && queueSecond != 0) {
             //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
@@ -185,10 +185,7 @@ int queueSecondIfRequired(void *context){
             secondsPlayed++;
         }
         return 1;
-    } /*else {
-        memset(queueBuffer1,0,96000);
-        (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, 96000);
-    }*/
+    }
     return 0;
 }
 
@@ -213,7 +210,7 @@ void* generateAudioThread(void* context){
     while(1)
     {
         isBuffering = 1;
-        while (secondsToGenerate > 0 && generatingAllowed == 1 && isPlaying){
+        while (secondsToGenerate > 0 && generatingAllowed == 1 && isPlaying && secondsPlayed!=trackLength){
             if (!initialDataCopied){
                 //__android_log_print(ANDROID_LOG_INFO, "KSS", "copy initial data to array!");
                 initialDataCopied=1;
@@ -227,7 +224,7 @@ void* generateAudioThread(void* context){
             secondsToGenerate--;
             if (secondsToGenerate==1) KSSPLAY_fade_start(kssplay, 1000); //todo: only fade when song loops...
             queueSecondResult = queueSecondIfRequired(context);
-            //__android_log_print(ANDROID_LOG_INFO, "KSS", "result of queueSecond: %d", queueSecondResult);
+            // __android_log_print(ANDROID_LOG_INFO, "KSS", "secondsPlayed: %d, trackLength: %d", secondsPlayed, trackLength);
             if (queueSecondResult==1) (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
             //if (queueSecondResult==2) nextTrack(context);
             nextMessageSend = 0;
@@ -244,6 +241,7 @@ void* generateAudioThread(void* context){
             nextMessageSend = 1;
         }
         usleep (500);
+        a++;
         if (a==100000) {
             __android_log_print(ANDROID_LOG_INFO, "KSS", "In thread!");
             a=0;
@@ -256,8 +254,6 @@ void* generateAudioThread(void* context){
             pthread_exit(100);
         }
     }
-    // auto next track when ended
-    // report generation to android app
 }
 
 void Java_nl_vlessert_vigamup_PlayerService_setKssProgress(JNIEnv* env, jclass clazz, int progress){
@@ -318,6 +314,7 @@ void Java_nl_vlessert_vigamup_PlayerService_setKss(JNIEnv* env, jclass clazz, ch
 }
 
 jboolean Java_nl_vlessert_vigamup_PlayerService_togglePlayback(JNIEnv* env, jclass clazz) {
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Paused status!!: %d", isPaused);
     if (isPaused) {
         (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
         isPaused = 0;
