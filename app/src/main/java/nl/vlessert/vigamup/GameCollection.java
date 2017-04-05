@@ -6,18 +6,17 @@ import android.util.Log;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.Random;
+import java.util.List;
 
 public class GameCollection {
     private int activeGame = 0;
-    private boolean randomizerActive = false;
     private ArrayList<Game> gameObjects;
     private ArrayList<Game> gameObjectsWithTrackInformation;
-    private ArrayList<Game> gameObjectsWithTrackInformationRandomized;
     private Context ctx;
-    private Random randomGenerator = new Random();
+
+    private List<String> randomizedGameAndTrackList = new ArrayList<>();
+    private int randomizedGameAndTrackListPosition = 0;
 
     private final String LOG_TAG = "ViGaMuP game collection";
 
@@ -45,28 +44,29 @@ public class GameCollection {
                 //Log.d("KSS","adding: " + game.gameName + " " + game.position);
             }
         }
-        Log.d(LOG_TAG, "gameObjectsWithTrackInformation size: "+ gameObjectsWithTrackInformation.size());
 
-        gameObjectsWithTrackInformationRandomized = new ArrayList<>(gameObjectsWithTrackInformation);
-        long seed = System.nanoTime();
-        Collections.shuffle(gameObjectsWithTrackInformationRandomized, new Random(seed));
+        int a, b = 0;
+        for (Game game : gameObjectsWithTrackInformation){
+            List<GameTrack> list = game.getGameTrackList();
+            for (a = 0; a < list.size(); a++){
+                randomizedGameAndTrackList.add(b+","+a);
+                Log.d(LOG_TAG, "game title: " + game.getTitle() + ", track position: " + a);
+            }
+            b++;
+        }
+        Collections.shuffle(randomizedGameAndTrackList);
 
         /*Log.d(LOG_TAG, "non random: " + Arrays.toString(gameObjectsWithTrackInformation.toArray()));
         Log.d(LOG_TAG, "random: " + Arrays.toString(gameObjectsWithTrackInformationRandomized.toArray()));*/
     }
-
-    public void enableRandomizer(){ randomizerActive = true; }
-    public void disableRandomizer(){ randomizerActive = false; }
 
     public void setCurrentGame(int position){
         activeGame = position;
     }
 
     public Game getCurrentGame(){
-        if (randomizerActive) return gameObjectsWithTrackInformationRandomized.get(activeGame); else return gameObjectsWithTrackInformation.get(activeGame);
+        return gameObjectsWithTrackInformation.get(activeGame);
     }
-
-    public Game getCurrentGameNonRandom(){ return gameObjectsWithTrackInformation.get(activeGame); }
 
     public void setNextGame(){
         if (activeGame == gameObjectsWithTrackInformation.size()-1) activeGame = 0;
@@ -81,5 +81,17 @@ public class GameCollection {
     public ArrayList<Game> getGameObjectsArrayList(){
         //Log.d("KSS","test vanuit getGameObjectsArrayList: " + getCurrentGameName());
         return gameObjects;
+    }
+
+    public String getNextRandomGameAndTrack(){
+        if (randomizedGameAndTrackListPosition == randomizedGameAndTrackList.size()-1) randomizedGameAndTrackListPosition = 0;
+            else randomizedGameAndTrackListPosition++;
+        return randomizedGameAndTrackList.get(randomizedGameAndTrackListPosition);
+    }
+
+    public String getPreviousRandomGameAndTrack(){
+        if (randomizedGameAndTrackListPosition == 0) randomizedGameAndTrackListPosition = randomizedGameAndTrackList.size()-1;
+            else randomizedGameAndTrackListPosition--;
+        return randomizedGameAndTrackList.get(randomizedGameAndTrackListPosition);
     }
 }

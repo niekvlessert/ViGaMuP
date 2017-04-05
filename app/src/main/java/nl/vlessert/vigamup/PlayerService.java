@@ -26,6 +26,8 @@ import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 import android.widget.RemoteViews;
 
+import java.util.List;
+
 public class PlayerService extends Service{
     private static final String LOG_TAG = "KSS PlayerService";
     private IBinder mBinder = new MyBinder();
@@ -60,6 +62,7 @@ public class PlayerService extends Service{
     int secondsBufferedFromCurrentTrack = 0;
 
     private boolean randomizer = false;
+    private Game currentGame;
     private boolean fromActivity = false;
 
     private boolean previousActionNext = false;
@@ -387,8 +390,8 @@ public class PlayerService extends Service{
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         Game game = gameCollection.getCurrentGame();
 
-        views.setTextViewText(R.id.status_bar_track_name, game.getCurrentTrackTitle(randomizeOnlyWhenFromNotifcation));
-        bigViews.setTextViewText(R.id.status_bar_track_name, game.getCurrentTrackTitle(randomizeOnlyWhenFromNotifcation));
+        views.setTextViewText(R.id.status_bar_track_name, game.getCurrentTrackTitle());
+        bigViews.setTextViewText(R.id.status_bar_track_name, game.getCurrentTrackTitle());
 
         views.setTextViewText(R.id.status_bar_artist_name, game.getTitle());
         bigViews.setTextViewText(R.id.status_bar_artist_name, game.getTitle());
@@ -419,37 +422,36 @@ public class PlayerService extends Service{
     private void nextTrack() {
         fixUninitialized();
         Log.d(LOG_TAG,"Next track called..." + Debug.getNativeHeapAllocatedSize() + " and " + Debug.getNativeHeapSize());
-        Game game = gameCollection.getCurrentGame();
-        Log.d(LOG_TAG,"game: " + game.getTitle());
+        Log.d(LOG_TAG,"game: " + currentGame.getTitle());
         sendBroadcast(new Intent("resetSeekBar"));
         switch (repeatMode) {
             case Constants.REPEAT_MODES.NORMAL_PLAYBACK:
             case Constants.REPEAT_MODES.LOOP_TRACK:
             case Constants.REPEAT_MODES.SHUFFLE_IN_GAME:
-                if (!game.setNextTrack()) {
+                if (!currentGame.setNextTrack()) {
                     gameCollection.setNextGame();
-                    game = gameCollection.getCurrentGame();
-                    game.setFirstTrack();
-                    Log.d(LOG_TAG, "Game in service: " + game.title + " " + game.position);
-                    setKssJava(game.musicFileC);
+                    currentGame = gameCollection.getCurrentGame();
+                    currentGame.setFirstTrack();
+                    Log.d(LOG_TAG, "Game in service: " + currentGame.title + " " + currentGame.position);
+                    setKssJava(currentGame.musicFileC);
                 }
                 break;
             case Constants.REPEAT_MODES.LOOP_GAME:
-                game.setNextTrack();
+                currentGame.setNextTrack();
                 break;
             case Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM:
-                gameCollection.setNextGame();
-                game = gameCollection.getCurrentGame();
-                if (!previousActionPrevious) game.setNextTrack();
-                setKssJava(game.musicFileC);
-                previousActionNext = true;
-                previousActionPrevious = false;
+                String gameAndTrackInfo = gameCollection.getNextRandomGameAndTrack();
+                String[] gameAndTrackInfoArray = gameAndTrackInfo.split(",");
+                gameCollection.setCurrentGame(Integer.parseInt(gameAndTrackInfoArray[0]));
+                currentGame = gameCollection.getCurrentGame();
+                currentGame.setTrack(Integer.parseInt(gameAndTrackInfoArray[1]));
+                setKssJava(currentGame.musicFileC);
+                Log.d(LOG_TAG,"gameAndTrackInfo: " + gameAndTrackInfo);
                 break;
         }
         Log.d(LOG_TAG, "Randomizer: " + randomizer);
-        setKssTrackJava(game.getCurrentTrackNumber(randomizer), game.getCurrentTrackLength(randomizer));
+        setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
         Intent intent = new Intent("setSlidingUpPanelWithGame");
-        intent.putExtra("RANDOMIZER",randomizer);
         sendBroadcast(intent);
         updateNotificationTitles();
         updateA2DPInfo();
@@ -457,35 +459,34 @@ public class PlayerService extends Service{
 
     private void previousTrack() {
         fixUninitialized();
-        Game game = gameCollection.getCurrentGame();
         sendBroadcast(new Intent("resetSeekBar"));
         switch (repeatMode) {
             case Constants.REPEAT_MODES.NORMAL_PLAYBACK:
             case Constants.REPEAT_MODES.LOOP_TRACK:
             case Constants.REPEAT_MODES.SHUFFLE_IN_GAME:
-                if (!game.setPreviousTrack()) {
+                if (!currentGame.setPreviousTrack()) {
                     gameCollection.setPreviousGame();
-                    game = gameCollection.getCurrentGame();
-                    game.setLastTrack();
-                    Log.d(LOG_TAG, "Game in service: " + game.title + " " + game.position);
-                    setKssJava(game.musicFileC);
+                    currentGame = gameCollection.getCurrentGame();
+                    currentGame.setLastTrack();
+                    Log.d(LOG_TAG, "Game in service: " + currentGame.title + " " + currentGame.position);
+                    setKssJava(currentGame.musicFileC);
                 }
                 break;
             case Constants.REPEAT_MODES.LOOP_GAME:
-                game.setPreviousTrack();
+                currentGame.setPreviousTrack();
                 break;
             case Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM:
-                gameCollection.setPreviousGame();
-                game = gameCollection.getCurrentGame();
-                if (!previousActionNext) game.setPreviousTrack();
-                setKssJava(game.musicFileC);
-                previousActionNext = false;
-                previousActionPrevious = true;
+                String gameAndTrackInfo = gameCollection.getPreviousRandomGameAndTrack();
+                String[] gameAndTrackInfoArray = gameAndTrackInfo.split(",");
+                gameCollection.setCurrentGame(Integer.parseInt(gameAndTrackInfoArray[0]));
+                currentGame = gameCollection.getCurrentGame();
+                currentGame.setTrack(Integer.parseInt(gameAndTrackInfoArray[1]));
+                setKssJava(currentGame.musicFileC);
+                Log.d(LOG_TAG,"gameAndTrackInfo: " + gameAndTrackInfo);
                 break;
         }
-        setKssTrackJava(game.getCurrentTrackNumber(randomizer), game.getCurrentTrackLength(randomizer));
+        setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
         Intent intent = new Intent("setSlidingUpPanelWithGame");
-        intent.putExtra("RANDOMIZER",randomizer);
         sendBroadcast(intent);
         updateNotificationTitles();
         updateA2DPInfo();
@@ -494,7 +495,7 @@ public class PlayerService extends Service{
     public void playCurrentTrack() {
         fromActivity = true;
         Game game = gameCollection.getCurrentGame();
-        setKssTrackJava(game.getCurrentTrackNumber(false), game.getCurrentTrackLength(false));
+        setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
         //sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
         updateNotificationTitles();
         updateA2DPInfo();
@@ -504,7 +505,7 @@ public class PlayerService extends Service{
     }
 
     public int getCurrentTrackLength(){
-        return gameCollection.getCurrentGame().getCurrentTrackLength(randomizer);
+        return gameCollection.getCurrentGame().getCurrentTrackLength();
     }
 
     public void setKssJava(String file){
@@ -539,17 +540,14 @@ public class PlayerService extends Service{
         }
     }
     private void fixUninitialized(){
+        currentGame = gameCollection.getCurrentGame();
         if (!hasGameCollection) createGameCollection();
         if (!kssSet) {
-            //gameCollection.setRandomGameWithTrackInformation();
-            Game game = gameCollection.getCurrentGame();
-            setKssJava(game.musicFileC);
-            setKssTrackJava(game.getCurrentTrackNumber(randomizer), game.getCurrentTrackLength(randomizer));
+            setKssJava(currentGame.musicFileC);
+            setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
         }
         if (!kssTrackSet) {
-            Game game = gameCollection.getCurrentGame();
-            setKssTrackJava(game.getCurrentTrackNumber(randomizer), game.getCurrentTrackLength(randomizer));
-            //togglePlayback();
+            setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
         }
     }
 
@@ -569,7 +567,6 @@ public class PlayerService extends Service{
         Handler handler = new Handler();
         switch(repeatMode) {
             case Constants.REPEAT_MODES.NORMAL_PLAYBACK :
-                gameCollection.disableRandomizer();
                 randomizer = false;
                 bigViews.setImageViewResource(R.id.status_bar_repeat,
                         R.drawable.img_btn_repeat_pressed);
@@ -596,14 +593,12 @@ public class PlayerService extends Service{
                 handler.postDelayed(new MyRunnable(game), 3000);
                 break;
             case Constants.REPEAT_MODES.SHUFFLE_IN_GAME :
-                gameCollection.enableRandomizer();
                 repeatMode = Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM;
                 bigViews.setTextViewText(R.id.status_bar_track_name,"Shuffle mode 2: shuffle in current platform");
                 mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
                 handler.postDelayed(new MyRunnable(game), 3000);
                 break;
             case Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM :
-                gameCollection.disableRandomizer();
                 randomizer = false;
                 repeatMode = Constants.REPEAT_MODES.NORMAL_PLAYBACK;
                 bigViews.setImageViewResource(R.id.status_bar_repeat,
@@ -624,21 +619,20 @@ public class PlayerService extends Service{
         @Override
         public void run() {
             NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            bigViews.setTextViewText(R.id.status_bar_track_name,game.getCurrentTrackTitle(randomizer));
+            bigViews.setTextViewText(R.id.status_bar_track_name,game.getCurrentTrackTitle());
             mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
         }
     }
-
 
     public void updateA2DPInfo(){
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             Game game = gameCollection.getCurrentGame();
             MediaMetadata metadata = new MediaMetadata.Builder()
-                .putString(MediaMetadata.METADATA_KEY_TITLE, game.getCurrentTrackTitle(randomizer))
+                .putString(MediaMetadata.METADATA_KEY_TITLE, game.getCurrentTrackTitle())
                 .putString(MediaMetadata.METADATA_KEY_ARTIST, game.getVendor())
                 .putString(MediaMetadata.METADATA_KEY_ALBUM, game.getTitle())
-                .putLong(MediaMetadata.METADATA_KEY_DURATION, game.getCurrentTrackLength(randomizer)*1000)
-                .putLong(MediaMetadata.METADATA_KEY_TRACK_NUMBER, game.getCurrentTrackNumber(randomizer))
+                .putLong(MediaMetadata.METADATA_KEY_DURATION, game.getCurrentTrackLength()*1000)
+                .putLong(MediaMetadata.METADATA_KEY_TRACK_NUMBER, game.getCurrentTrackNumber())
                 .build();
 
             mMediaSession.setMetadata(metadata);

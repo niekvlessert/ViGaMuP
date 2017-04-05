@@ -93,7 +93,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     PlayerService mPlayerService;
     boolean mServiceBound = false;
 
-    private boolean notificationRandomizerActive = false;
     private boolean initialized = false;
 
     GameList gameList;
@@ -208,16 +207,13 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 }
                 if (intent.getAction().equals("setSlidingUpPanelWithGame")){
                     Game game = gameCollection.getCurrentGame();
-                    notificationRandomizerActive = intent.getBooleanExtra("RANDOMIZER", false);
-                    Log.d(LOG_TAG, "action: " + notificationRandomizerActive);
-                    seekBar.setMax(game.getCurrentTrackLength(notificationRandomizerActive));
+                    seekBar.setMax(game.getCurrentTrackLength());
                     bufferBarProgress = 2; // 2 seconds buffered always in advance...
                     seekBarThumbProgress = 0;
                     seekBar.setProgress(0);
                     LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
                     ivLayout.setVisibility(LinearLayout.GONE);
                     showGame(false);
-                    notificationRandomizerActive = false;
                 }
                 if (intent.getAction().equals(DownloadManager.ACTION_DOWNLOAD_COMPLETE)){
                     Log.d(LOG_TAG, "Download event!!: " + intent.getAction());
@@ -239,10 +235,10 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         registerReceiver(receiver, filter);
         if (mServiceBound) {
             gameCollection = mPlayerService.gameCollection;
-            Game game = gameCollection.getCurrentGameNonRandom();
+            Game game = gameCollection.getCurrentGame();
             TextView tv = (TextView) findViewById(R.id.playerTopLayoutName);
-            tv.setText(Html.fromHtml("<b>"+game.getTitle()+"</b><br/>"+game.getCurrentTrackTitle(mPlayerService.getRandomStatus())));
-            seekBar.setMax(game.getCurrentTrackLength(false));
+            tv.setText(Html.fromHtml("<b>"+game.getTitle()+"</b><br/>"+game.getCurrentTrackTitle()));
+            seekBar.setMax(game.getCurrentTrackLength());
             bufferBarProgress = 2; // 2 seconds buffered always in advance...
             seekBarThumbProgress = 0;
             seekBar.setProgress(0);
@@ -302,8 +298,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 gameCollection = mPlayerService.gameCollection;
                 Game game;
                 if (mPlayerService.getRandomStatus()) game = gameCollection.getCurrentGame();
-                    else game = gameCollection.getCurrentGameNonRandom();
-                seekBar.setMax(game.getCurrentTrackLength(false));
+                    else game = gameCollection.getCurrentGame();
+                seekBar.setMax(game.getCurrentTrackLength());
                 bufferBarProgress = 2; // 2 seconds buffered always in advance...
                 seekBarThumbProgress = 0;
                 seekBar.setProgress(0);
@@ -512,14 +508,12 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     }
 
     public void showGame(boolean setNewKss) {
-        Game game;
-        if (notificationRandomizerActive) game = gameCollection.getCurrentGame();
-            else game = gameCollection.getCurrentGameNonRandom();
+        Game game = gameCollection.getCurrentGame();
         Log.d("KSS", "game " + game.getTitle());
         currentShowedGameTitle = game.getTitle();
 
         TextView tv = (TextView) findViewById(R.id.playerTopLayoutName);
-        tv.setText(Html.fromHtml("<b>"+game.getTitle()+"</b><br/>"+game.getCurrentTrackTitle(mPlayerService.getRandomStatus())));
+        tv.setText(Html.fromHtml("<b>"+game.getTitle()+"</b><br/>"+game.getCurrentTrackTitle()));
 
         View header, header2;
         boolean gameLogoImageFound = true;
@@ -565,15 +559,13 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 //Log.d(LOG_TAG,"setting color on: " + lv.getChildAt(position));
                 //lv.getChildAt(position).setBackgroundColor(Color.GREEN);
                 //lv.setBackgroundColor(Color.WHITE);
-                Game game;
-                if (notificationRandomizerActive) game = gameCollection.getCurrentGame();
-                else game = gameCollection.getCurrentGameNonRandom();
+                Game game = gameCollection.getCurrentGame();
                 game.setTrack(position-1);
 
                 //new Thread(new Runnable() {
                     //public void run() {
                         //Game game = gameCollection.getCurrentGame();
-                        seekBar.setMax(game.getCurrentTrackLength(false));
+                        seekBar.setMax(game.getCurrentTrackLength());
                         bufferBarProgress = 2; // 2 seconds buffered always in advance...
                         seekBarThumbProgress = 0;
                         seekBar.setProgress(0);
