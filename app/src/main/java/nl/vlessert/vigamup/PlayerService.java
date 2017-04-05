@@ -26,8 +26,6 @@ import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 import android.widget.RemoteViews;
 
-import java.util.List;
-
 public class PlayerService extends Service{
     private static final String LOG_TAG = "KSS PlayerService";
     private IBinder mBinder = new MyBinder();
@@ -128,6 +126,10 @@ public class PlayerService extends Service{
             }
             createBufferQueueAudioPlayer(sampleRate, bufSize);
 
+            if (!hasGameCollection){
+                createGameCollection();
+                hasGameCollection = true;
+            }
             createNotification();
 
         } else if (intent.getAction().equals(Constants.ACTION.PREV_ACTION)) {
@@ -264,6 +266,8 @@ public class PlayerService extends Service{
             }
         }
     }
+
+    public boolean isPaused(){ return paused; }
 
     private void createNotification(){
         Log.i(LOG_TAG, "Received Start Foreground Intent ");
@@ -553,6 +557,7 @@ public class PlayerService extends Service{
 
     public void togglePlaybackJava(){
         fixUninitialized();
+
         paused = togglePlayback();
         if (paused) setPlayingStatePause(); else setPlayingStatePlaying();
         Log.d("KSS","togglePlaybackJava...: " + notificationPlaying);

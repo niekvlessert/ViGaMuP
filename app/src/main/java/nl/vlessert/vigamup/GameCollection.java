@@ -50,7 +50,7 @@ public class GameCollection {
             List<GameTrack> list = game.getGameTrackList();
             for (a = 0; a < list.size(); a++){
                 randomizedGameAndTrackList.add(b+","+a);
-                Log.d(LOG_TAG, "game title: " + game.getTitle() + ", track position: " + a);
+                //Log.d(LOG_TAG, "game title: " + game.getTitle() + ", track position: " + a);
             }
             b++;
         }
@@ -67,6 +67,8 @@ public class GameCollection {
     public Game getCurrentGame(){
         return gameObjectsWithTrackInformation.get(activeGame);
     }
+
+    public Game getGameAtPosition(int position){ return gameObjectsWithTrackInformation.get(position); }
 
     public void setNextGame(){
         if (activeGame == gameObjectsWithTrackInformation.size()-1) activeGame = 0;

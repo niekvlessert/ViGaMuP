@@ -16,7 +16,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Point;
-import android.media.Image;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -26,7 +25,6 @@ import android.support.v4.app.FragmentManager;
 import android.support.v4.content.ContextCompat;
 import android.text.Html;
 import android.util.Log;
-import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
@@ -98,6 +96,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     GameList gameList;
 
     private GameCollection gameCollection;
+    private boolean gameListShowing = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -110,7 +109,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
         setSupportActionBar(toolbar);
 
-        Log.d(LOG_TAG,"HIERRRRRRRRRR");
+        Log.d(LOG_TAG,"In onCreate....");
         Intent startIntent = new Intent(MainActivity.this, PlayerService.class);
         startIntent.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
         startService(startIntent);
@@ -180,12 +179,12 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             }
         });
 
-        gameCollection = new GameCollection(this);
-
-        if (checkForMusicAndInitialize()) {
+        //gameCollection = new GameCollection(this);
+        checkForMusicAndInitialize();
+        /*if (checkForMusicAndInitialize()) {
             gameCollection.createGameCollection();
             showMusicList(gameList);
-        }
+        }*/
 
         filter = new IntentFilter();
         filter.addAction("setBufferBarProgress");
@@ -213,6 +212,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     seekBar.setProgress(0);
                     LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
                     ivLayout.setVisibility(LinearLayout.GONE);
+                    initialized = true;
                     showGame(false);
                 }
                 if (intent.getAction().equals(DownloadManager.ACTION_DOWNLOAD_COMPLETE)){
@@ -291,20 +291,23 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             MyBinder myBinder = (MyBinder) service;
             mPlayerService = myBinder.getService();
             mServiceBound = true;
-            if (!mPlayerService.hasGameCollection) mPlayerService.setGameCollection(gameCollection);
-            else {
-                LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
-                ivLayout.setVisibility(LinearLayout.GONE);
-                gameCollection = mPlayerService.gameCollection;
-                Game game;
-                if (mPlayerService.getRandomStatus()) game = gameCollection.getCurrentGame();
-                    else game = gameCollection.getCurrentGame();
+
+            LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
+            ivLayout.setVisibility(LinearLayout.GONE);
+            gameCollection = mPlayerService.gameCollection;
+            if (!gameListShowing){
+                showMusicList(gameList);
+                gameListShowing = true;
+            }
+            if (!mPlayerService.isPaused()) {
+                Game game = gameCollection.getCurrentGame();
                 seekBar.setMax(game.getCurrentTrackLength());
                 bufferBarProgress = 2; // 2 seconds buffered always in advance...
                 seekBarThumbProgress = 0;
                 seekBar.setProgress(0);
                 Log.d(LOG_TAG, "Game in activity: " + game.title + " " + game.position);
-                if (!game.getTitle().equals(currentShowedGameTitle)) showGame(false);
+                initialized = true;
+                showGame(false);
             }
         }
     };
@@ -503,8 +506,12 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
     @Override
     public void gameClicked(int position) {
-        gameCollection.setCurrentGame(position);
-        showGame(true);
+        if (gameCollection.getGameAtPosition(position).getTitle().equals(gameCollection.getCurrentGame().getTitle())){
+            showGame(false);
+        } else {
+            gameCollection.setCurrentGame(position);
+            showGame(true);
+        }
     }
 
     public void showGame(boolean setNewKss) {
