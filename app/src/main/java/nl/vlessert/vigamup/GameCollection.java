@@ -56,6 +56,7 @@ public class GameCollection {
         }
         Collections.shuffle(randomizedGameAndTrackList);
 
+        //Log.d(LOG_TAG,"hmmmm " + gameObjects.size() + " == " + gameObjectsWithTrackInformation.size() + "?");
         /*Log.d(LOG_TAG, "non random: " + Arrays.toString(gameObjectsWithTrackInformation.toArray()));
         Log.d(LOG_TAG, "random: " + Arrays.toString(gameObjectsWithTrackInformationRandomized.toArray()));*/
     }

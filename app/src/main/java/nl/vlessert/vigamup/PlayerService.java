@@ -431,7 +431,6 @@ public class PlayerService extends Service{
         switch (repeatMode) {
             case Constants.REPEAT_MODES.NORMAL_PLAYBACK:
             case Constants.REPEAT_MODES.LOOP_TRACK:
-            case Constants.REPEAT_MODES.SHUFFLE_IN_GAME:
                 if (!currentGame.setNextTrack()) {
                     gameCollection.setNextGame();
                     currentGame = gameCollection.getCurrentGame();
@@ -442,6 +441,11 @@ public class PlayerService extends Service{
                 break;
             case Constants.REPEAT_MODES.LOOP_GAME:
                 currentGame.setNextTrack();
+                break;
+            case Constants.REPEAT_MODES.SHUFFLE_IN_GAME:
+                GameTrack gt = currentGame.getNextRandomTrack();
+                Log.d(LOG_TAG,"tracknr. : " + gt.getTrackNr());
+                currentGame.setTrack(gt.getPosition());
                 break;
             case Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM:
                 String gameAndTrackInfo = gameCollection.getNextRandomGameAndTrack();
@@ -467,7 +471,6 @@ public class PlayerService extends Service{
         switch (repeatMode) {
             case Constants.REPEAT_MODES.NORMAL_PLAYBACK:
             case Constants.REPEAT_MODES.LOOP_TRACK:
-            case Constants.REPEAT_MODES.SHUFFLE_IN_GAME:
                 if (!currentGame.setPreviousTrack()) {
                     gameCollection.setPreviousGame();
                     currentGame = gameCollection.getCurrentGame();
@@ -479,6 +482,10 @@ public class PlayerService extends Service{
             case Constants.REPEAT_MODES.LOOP_GAME:
                 currentGame.setPreviousTrack();
                 break;
+            case Constants.REPEAT_MODES.SHUFFLE_IN_GAME:
+                GameTrack gt = currentGame.getPreviousRandomTrack();
+                currentGame.setTrack(gt.getPosition());
+                break;
             case Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM:
                 String gameAndTrackInfo = gameCollection.getPreviousRandomGameAndTrack();
                 String[] gameAndTrackInfoArray = gameAndTrackInfo.split(",");
@@ -489,8 +496,8 @@ public class PlayerService extends Service{
                 Log.d(LOG_TAG,"gameAndTrackInfo: " + gameAndTrackInfo);
                 break;
         }
-        setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
         Intent intent = new Intent("setSlidingUpPanelWithGame");
+        setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
         sendBroadcast(intent);
         updateNotificationTitles();
         updateA2DPInfo();

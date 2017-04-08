@@ -10,13 +10,9 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 import java.util.Scanner;
 
 /**
@@ -45,6 +41,8 @@ public class Game {
     private String logoBackGroundColor = null;
 
     private ArrayList<GameTrack> trackInformation = new ArrayList<>();
+    private ArrayList<GameTrack> randomizedTrackInformation;
+    int randomizedTrackInformationPosition;
 
     private static final int REPEAT_TIMES=2;
 
@@ -93,7 +91,7 @@ public class Game {
 
                 if (Collections.binarySearch(trackList, track) >=0) {
                     //Log.d("KSS", "adding track: " + track + " " + title + " " + length);
-                    trackInformation.add(new GameTrack(track, title, length, partToSkip, repeatable));
+                    trackInformation.add(new GameTrack(track, title, length, partToSkip, repeatable, trackNumber));
                     addedTracks.add(track);
                 }
                 trackNumber++;
@@ -113,7 +111,7 @@ public class Game {
                 //Log.d("KSS", "Skipped, so add with defaults: " + trackInt.toString());
                 if (trackNumber<10) title = "0"+ Integer.toString(trackNumber); else title = Integer.toString(trackNumber);
                 title += " - Track " +trackInt.toString(); //Log.d("KSS","title: " + title); }
-                trackInformation.add(new GameTrack(trackInt, title, 120, 0, false));
+                trackInformation.add(new GameTrack(trackInt, title, 120, 0, false, trackNumber));
                 trackNumber++;
             }
             //Log.d("KSS", )
@@ -125,10 +123,12 @@ public class Game {
                 for (int i =0; i < trackList.size(); i++){
                     if (i+1<10) title = "0"+ Integer.toString(i+1); else title = Integer.toString(i+1);
                     title += " - Track " + trackList.get(i);
-                    trackInformation.add(new GameTrack(trackList.get(i), title, 30, 0, true));
+                    trackInformation.add(new GameTrack(trackList.get(i), title, 30, 0, true, i));
                 }
             }
         }
+        randomizedTrackInformation = new ArrayList<>(trackInformation);
+        Collections.shuffle(randomizedTrackInformation);
         return true;
     }
 
@@ -277,5 +277,18 @@ public class Game {
     public void setLastTrack(){ position = trackList.size()-1; }
     public List<GameTrack> getGameTrackList(){
         return trackInformation;
+    }
+    public GameTrack getNextRandomTrack(){
+        if (randomizedTrackInformationPosition == randomizedTrackInformation.size()-1) randomizedTrackInformationPosition = 0;
+        else randomizedTrackInformationPosition++;
+        Log.d("KSS","track nr: " +randomizedTrackInformationPosition);
+        return randomizedTrackInformation.get(randomizedTrackInformationPosition);
+    }
+
+    public GameTrack getPreviousRandomTrack() {
+        if (randomizedTrackInformationPosition == 0)
+            randomizedTrackInformationPosition = randomizedTrackInformation.size() - 1;
+        else randomizedTrackInformationPosition--;
+        return randomizedTrackInformation.get(randomizedTrackInformationPosition);
     }
 }

@@ -6,18 +6,20 @@ package nl.vlessert.vigamup;
 
 public class GameTrack {
 
-    int trackNr;
+    private int trackNr;
     String title;
-    int length;
-    int partToSkipWhenUsingRepeat;
-    boolean repeatable;
+    private int length;
+    private int partToSkipWhenUsingRepeat;
+    private boolean repeatable;
+    private int position;
 
-    public GameTrack(int trackNr, String title, int length, int partToSkipWhenUsingRepeat, boolean repeatable){
+    public GameTrack(int trackNr, String title, int length, int partToSkipWhenUsingRepeat, boolean repeatable, int position){
         this.trackNr = trackNr;
         this.title = title;
         this.length = length;
         this.partToSkipWhenUsingRepeat = partToSkipWhenUsingRepeat;
         this.repeatable = repeatable;
+        this.position = position;
     }
 
     public int getPlayTimeWithRepeat(int amountToRepeat) {
@@ -35,5 +37,9 @@ public class GameTrack {
 
     public int getTrackLength(){
         return length;
+    }
+
+    public int getPosition(){
+        return position;
     }
 }

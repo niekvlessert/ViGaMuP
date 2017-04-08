@@ -303,7 +303,9 @@ void Java_nl_vlessert_vigamup_PlayerService_setKss(JNIEnv* env, jclass clazz, ch
         }
         kssplay = KSSPLAY_new(48000, 1, 16); // so frequency (48k) * channels (1) * bitrate (16) = 96000 bytes per second
         KSSPLAY_set_data(kssplay, kss);
-        KSSPLAY_set_master_volume(kssplay,100);
+        KSSPLAY_set_master_volume(kssplay,80); //on 100 it will overpower when increasing OPLL volume
+        KSSPLAY_set_device_volume(kssplay,EDSC_PSG,20); //emphasise drums (mostly)
+        KSSPLAY_set_device_volume(kssplay,EDSC_OPLL,30); //FMPAC is just to soft by default imho
         currentFile = file;
 
         __android_log_print(ANDROID_LOG_INFO, "KSS", "FMPAC enabled: %d", kss->fmpac);

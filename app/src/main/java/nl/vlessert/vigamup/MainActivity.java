@@ -582,17 +582,18 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             }
         });
 
-        List<String> your_array_list = game.getTrackInformationList();
+        List<String> trackArrayList = game.getTrackInformationList();
 
-        if (your_array_list.size()==0) {
+        if (trackArrayList.size()==0) {
             Log.d(LOG_TAG,"No track information... let's generate it!!");
             mPlayerService.generateTrackInformation();
+            trackArrayList = game.getTrackInformationList();
         }
 
         ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(
                 this,
                 android.R.layout.simple_list_item_1,
-                your_array_list );
+                trackArrayList );
 
         if (headerAddedBefore) {
             View view = lv.getAdapter().getView(0, null, lv);
