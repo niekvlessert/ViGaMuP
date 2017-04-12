@@ -30,35 +30,6 @@ static SLMuteSoloItf bqPlayerMuteSolo;
 static SLVolumeItf bqPlayerVolume;
 static SLmilliHertz bqPlayerSampleRate = 0;
 
-
-// aux effect on the output mix, used by the buffer queue player
-//static const SLEnvironmentalReverbSettings reverbSettings =
-  //      SL_I3DL2_ENVIRONMENT_PRESET_STONECORRIDOR;
-
-/*// URI player interfaces
-static SLObjectItf uriPlayerObject = NULL;
-static SLPlayItf uriPlayerPlay;
-static SLSeekItf uriPlayerSeek;
-static SLMuteSoloItf uriPlayerMuteSolo;
-static SLVolumeItf uriPlayerVolume;
-
-// file descriptor player interfaces
-static SLObjectItf fdPlayerObject = NULL;
-static SLPlayItf fdPlayerPlay;
-static SLSeekItf fdPlayerSeek;
-static SLMuteSoloItf fdPlayerMuteSolo;
-static SLVolumeItf fdPlayerVolume;
-*/
-// recorder interfaces
-/*static SLObjectItf recorderObject = NULL;
-static SLRecordItf recorderRecord;
-static SLAndroidSimpleBufferQueueItf recorderBufferQueue;*/
-
-// pointer and size of the next player buffer to enqueue, and number of remaining buffers
-//static short *nextBuffer;
-//static unsigned nextSize;
-//static int nextCount;
-
 KSSPLAY *kssplay;
 KSS *kss;
 FILE *fp;
@@ -78,6 +49,10 @@ int16_t *wavebuf;
 int16_t *wavebuf2;
 int nextMessageSend = 0;
 int terminateThread = 0;
+int threadTerminated = 0;
+int loopTrack = 0;
+
+int slesThingsCreated = 0;
 
 long previousSum = 0;
 
@@ -117,6 +92,7 @@ void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
 {
     queueSecond = 1;
     generatingAllowed = 1;
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Callback called!!");
 }
 
 void nextTrack(void* context){
@@ -124,13 +100,13 @@ void nextTrack(void* context){
     JavaVM *javaVM = pctx->javaVM;
     JNIEnv *env;
     jint res = (*javaVM)->GetEnv(javaVM, (void**)&env, JNI_VERSION_1_6);
-    if (res != JNI_OK) {
+    /*if (res != JNI_OK) {
         res = (*javaVM)->AttachCurrentThread(javaVM, &env, NULL);
         __android_log_print(ANDROID_LOG_INFO, "KSS", "Attaching!!");
         if (JNI_OK != res) {
             __android_log_print(ANDROID_LOG_INFO, "KSS", "Failed to AttachCurrentThread, ErrorCode = %d", res);
         }
-    }
+    }*/
     jmethodID nextTrackId = (*env)->GetMethodID(env, pctx->PlayerServiceClz, "nextTrack", "()V");
     (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, nextTrackId);
 }
@@ -165,24 +141,27 @@ int queueSecondIfRequired(void *context){
             secondsPlayed++;
             (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, 96000);
             if (checkForSilence(queueBufferSilence)) secondsPlayed=trackLength; // force next Track...
-        }
-        if (queueBufferToUse == 2 && queueSecond != 0) {
-            //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
-            memcpy(queueBuffer2, (int8_t *) &fullTrackWavebuf[secondsPlayed * 48000], 96000);
-            //if (checkForSilence(queueBuffer2)) nextTrack(context);
-            (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer2, 96000);
-            queueSecond = 0;
-            queueBufferToUse++;
-            secondsPlayed++;
-        }
-        if (queueBufferToUse == 3 && queueSecond != 0) {
-            //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
-            memcpy(queueBuffer3, (int8_t *) &fullTrackWavebuf[secondsPlayed * 48000], 96000);
-            //if (checkForSilence(queueBuffer3)) nextTrack(context);
-            (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer3, 96000);
-            queueSecond = 0;
-            queueBufferToUse = 1;
-            secondsPlayed++;
+        } else {
+            if (queueBufferToUse == 2 && queueSecond != 0) {
+                //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
+                memcpy(queueBuffer2, (int8_t *) &fullTrackWavebuf[secondsPlayed * 48000], 96000);
+                //if (checkForSilence(queueBuffer2)) nextTrack(context);
+                (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer2, 96000);
+                queueSecond = 0;
+                queueBufferToUse++;
+                secondsPlayed++;
+            } else {
+                if (queueBufferToUse == 3 && queueSecond != 0) {
+                    //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
+                    memcpy(queueBuffer3, (int8_t *) &fullTrackWavebuf[secondsPlayed * 48000],
+                           96000);
+                    //if (checkForSilence(queueBuffer3)) nextTrack(context);
+                    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer3, 96000);
+                    queueSecond = 0;
+                    queueBufferToUse = 1;
+                    secondsPlayed++;
+                }
+            }
         }
         return 1;
     }
@@ -209,64 +188,87 @@ void* generateAudioThread(void* context){
     int queueSecondResult=0;
     while(1)
     {
-        isBuffering = 1;
-        while (secondsToGenerate > 0 && generatingAllowed == 1 && isPlaying && secondsPlayed!=trackLength){
-            if (!initialDataCopied){
-                //__android_log_print(ANDROID_LOG_INFO, "KSS", "copy initial data to array!");
-                initialDataCopied=1;
-                memcpy(fullTrackWavebuf,wavebuf,96000);
-                memcpy((int8_t *)&fullTrackWavebuf[48000],wavebuf2,96000);
-                secondsPlayed = 2;
-                secondsToGenerate = secondsToGenerate - 2;
+        if (!loopTrack) {
+            isBuffering = 1;
+
+            while (secondsToGenerate > 0 && generatingAllowed == 1 && isPlaying &&
+                   secondsPlayed != trackLength && !terminateThread) {
+                if (!initialDataCopied) {
+                    //__android_log_print(ANDROID_LOG_INFO, "KSS", "copy initial data to array!");
+                    initialDataCopied = 1;
+                    memcpy(fullTrackWavebuf, wavebuf, 96000);
+                    memcpy((int8_t *) &fullTrackWavebuf[48000], wavebuf2, 96000);
+                    secondsPlayed = 2;
+                    secondsToGenerate = secondsToGenerate - 2;
+                }
+                KSSPLAY_calc(kssplay, &fullTrackWavebuf[(trackLength - secondsToGenerate) * 48000], 48000);
+                (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setBufferBarProgressId);
+                secondsToGenerate--;
+                if (secondsToGenerate == 1)
+                    KSSPLAY_fade_start(kssplay, 1000); //todo: only fade when song loops...
+                queueSecondResult = queueSecondIfRequired(context);
+                // __android_log_print(ANDROID_LOG_INFO, "KSS", "secondsPlayed: %d, trackLength: %d", secondsPlayed, trackLength);
+                if (queueSecondResult == 1)
+                    (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
+                nextMessageSend = 0;
             }
-            KSSPLAY_calc(kssplay, (int8_t *)&fullTrackWavebuf[(trackLength-secondsToGenerate)*48000], 48000);
-            (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setBufferBarProgressId);
-            secondsToGenerate--;
-            if (secondsToGenerate==1) KSSPLAY_fade_start(kssplay, 1000); //todo: only fade when song loops...
-            queueSecondResult = queueSecondIfRequired(context);
-            // __android_log_print(ANDROID_LOG_INFO, "KSS", "secondsPlayed: %d, trackLength: %d", secondsPlayed, trackLength);
-            if (queueSecondResult==1) (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
-            //if (queueSecondResult==2) nextTrack(context);
-            nextMessageSend = 0;
-        }
-        isBuffering=0;
-        if (queueSecondIfRequired(context)==1) (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
-        if (isPlaying && !nextMessageSend && secondsPlayed==trackLength && trackLength!=0) {
-            __android_log_print(ANDROID_LOG_INFO, "KSS", "is playing! %d %d %d %d", isPlaying, nextMessageSend, secondsPlayed, trackLength);
-            sleep (2);
+            isBuffering = 0;
+            if (queueSecondIfRequired(context) == 1)
+                (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
+            if (isPlaying && !nextMessageSend && secondsPlayed == trackLength && trackLength != 0) {
+                __android_log_print(ANDROID_LOG_INFO, "KSS", "is playing! %d %d %d %d", isPlaying,
+                                    nextMessageSend, secondsPlayed, trackLength);
+                sleep(2);
 
-            (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, nextTrackId);
-            //(*javaVM)->DetachCurrentThread(javaVM);
+                (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, nextTrackId);
 
-            nextMessageSend = 1;
+                nextMessageSend = 1;
+            }
+        } else {
+            if (isPlaying) {
+                while (loopTrack) {
+                    if (queueBufferToUse == 1) {
+                        KSSPLAY_calc(kssplay, queueBuffer1, 48000);
+                        KSSPLAY_calc(kssplay, queueBuffer2, 48000);
+                        KSSPLAY_calc(kssplay, queueBuffer3, 48000);
+                        (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, 96000);
+                        queueBufferToUse++;
+                    } else {
+                        if (queueBufferToUse == 2) {
+                            (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer2,
+                                                            96000);
+                            queueBufferToUse++;
+                        } else {
+                            (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer3,
+                                                            96000);
+                            queueBufferToUse = 1;
+                        }
+                    }
+                    sleep(1);
+                }
+            }
         }
         usleep (500);
-        a++;
-        if (a==100000) {
-            __android_log_print(ANDROID_LOG_INFO, "KSS", "In thread!");
+        if (a==10000) {
+            __android_log_print(ANDROID_LOG_INFO, "KSS", "is playing! %d secondstogenerate %d generatingallowed %d secondsplayed %d tracklength %d terminatethread %d", isPlaying, secondsToGenerate, generatingAllowed,
+                                secondsPlayed, trackLength ,!terminateThread);
+
+            // __android_log_print(ANDROID_LOG_INFO, "KSS", "In thread!");
             a=0;
         }
         a++;
-        if (terminateThread==1 && pthread_equal(id,t1)) {
+        if (terminateThread==1) {
             __android_log_print(ANDROID_LOG_INFO, "KSS", "terminating thread");
-            pthread_join(id,NULL);
             (*javaVM)->DetachCurrentThread(javaVM);
-            pthread_exit(100);
+            threadTerminated=1;
+            pthread_exit(NULL);
         }
     }
 }
 
 void Java_nl_vlessert_vigamup_PlayerService_setKssProgress(JNIEnv* env, jclass clazz, int progress){
     pthread_mutex_lock(&lock);
-    //(*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_STOPPED);
-    //free(fullTrackWavebuf);
-    //SLresult result = (*bqPlayerBufferQueue)->Clear(bqPlayerBufferQueue);
-    //if (SL_RESULT_SUCCESS != result) {
-       // __android_log_print(ANDROID_LOG_INFO, "KSS", "Clear failed at begin of OpenSL_startRecording()() result=%d\n", result);
-        //return;
-    //}
     secondsPlayed=progress;
-    //(*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
     pthread_mutex_unlock(&lock);
 }
 
@@ -279,14 +281,12 @@ void Java_nl_vlessert_vigamup_PlayerService_setKss(JNIEnv* env, jclass clazz, ch
             usleep(100);
         }
         pthread_mutex_lock(&lock);
-        //(*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_STOPPED);
-        //free(fullTrackWavebuf);
+
         SLresult result = (*bqPlayerBufferQueue)->Clear(bqPlayerBufferQueue);
         if (SL_RESULT_SUCCESS != result) {
             __android_log_print(ANDROID_LOG_INFO, "KSS", "Clear failed at begin of OpenSL_startRecording()() result=%d\n", result);
             return;
         }
-        //(*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
         pthread_mutex_unlock(&lock);
     }
 
@@ -296,7 +296,6 @@ void Java_nl_vlessert_vigamup_PlayerService_setKss(JNIEnv* env, jclass clazz, ch
             KSS_delete(kss);
         }
         __android_log_print(ANDROID_LOG_INFO, "KSS", "Loading KSS... %s",utf8File);
-        //char *file = "/sdcard/Download/ViGaMuP/KSS/quarth.kss";
 
         if ((kss = KSS_load_file(utf8File)) == NULL) {
             __android_log_print(ANDROID_LOG_INFO, "KSS", "Error loading... KSS...");
@@ -309,10 +308,7 @@ void Java_nl_vlessert_vigamup_PlayerService_setKss(JNIEnv* env, jclass clazz, ch
         currentFile = file;
 
         __android_log_print(ANDROID_LOG_INFO, "KSS", "FMPAC enabled: %d", kss->fmpac);
-
-
     }
-
 }
 
 jboolean Java_nl_vlessert_vigamup_PlayerService_togglePlayback(JNIEnv* env, jclass clazz) {
@@ -357,12 +353,16 @@ void Java_nl_vlessert_vigamup_PlayerService_setKssTrack(JNIEnv* env, jclass claz
     secondsToGenerate = secondsToPlay;
     if (secondsToPlay==1) secondsToPlay=3;
     trackLength = secondsToPlay;
-    free(fullTrackWavebuf);
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Komt ie hier?!?!? %d", (int)sizeof(fullTrackWavebuf));
+    if (fullTrackWavebuf!=NULL) free(fullTrackWavebuf);
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Hier dan?!?!? %d ", secondsToPlay);
     fullTrackWavebuf = malloc(96000 * secondsToPlay);
     KSSPLAY_calc(kssplay, wavebuf, 48000);
     KSSPLAY_calc(kssplay, wavebuf2, 48000);
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Of hier....");
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf, 96000);
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf2, 96000);
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "En hier?!?!?");
     isPlaying = 1;
 }
 
@@ -371,47 +371,49 @@ void Java_nl_vlessert_vigamup_PlayerService_createEngine(JNIEnv* env, jobject in
 {
     SLresult result;
 
-    // create engine
-    result = slCreateEngine(&engineObject, 0, NULL, 0, NULL, NULL);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+    if (!slesThingsCreated) {
 
-    // realize the engine
-    result = (*engineObject)->Realize(engineObject, SL_BOOLEAN_FALSE);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+        // create engine
+        result = slCreateEngine(&engineObject, 0, NULL, 0, NULL, NULL);
+        assert(SL_RESULT_SUCCESS == result);
+        (void) result;
 
-    // get the engine interface, which is needed in order to create other objects
-    result = (*engineObject)->GetInterface(engineObject, SL_IID_ENGINE, &engineEngine);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+        // realize the engine
+        result = (*engineObject)->Realize(engineObject, SL_BOOLEAN_FALSE);
+        assert(SL_RESULT_SUCCESS == result);
+        (void) result;
 
-    // create output mix, with environmental reverb specified as a non-required interface
-    //const SLInterfaceID ids[1] = {SL_IID_ENVIRONMENTALREVERB};
-    //const SLInterfaceID ids[1] = {SL_IID_VOLUME};
-    const SLboolean req[1] = {SL_BOOLEAN_FALSE};
-    result = (*engineEngine)->CreateOutputMix(engineEngine, &outputMixObject, 0, NULL, req);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+        // get the engine interface, which is needed in order to create other objects
+        result = (*engineObject)->GetInterface(engineObject, SL_IID_ENGINE, &engineEngine);
+        assert(SL_RESULT_SUCCESS == result);
+        (void) result;
 
-    // realize the output mix
-    result = (*outputMixObject)->Realize(outputMixObject, SL_BOOLEAN_FALSE);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+        // create output mix, with environmental reverb specified as a non-required interface
+        //const SLInterfaceID ids[1] = {SL_IID_ENVIRONMENTALREVERB};
+        //const SLInterfaceID ids[1] = {SL_IID_VOLUME};
+        const SLboolean req[1] = {SL_BOOLEAN_FALSE};
+        result = (*engineEngine)->CreateOutputMix(engineEngine, &outputMixObject, 0, NULL, req);
+        assert(SL_RESULT_SUCCESS == result);
+        (void) result;
 
-    // get the environmental reverb interface
-    // this could fail if the environmental reverb effect is not available,
-    // either because the feature is not present, excessive CPU load, or
-    // the required MODIFY_AUDIO_SETTINGS permission was not requested and granted
-    /*result = (*outputMixObject)->GetInterface(outputMixObject, SL_IID_ENVIRONMENTALREVERB,
-                                              &outputMixEnvironmentalReverb);
-    if (SL_RESULT_SUCCESS == result) {
-        result = (*outputMixEnvironmentalReverb)->SetEnvironmentalReverbProperties(
-                outputMixEnvironmentalReverb, &reverbSettings);
-        (void)result;
-    }*/
-    // ignore unsuccessful result codes for environmental reverb, as it is optional for this example
+        // realize the output mix
+        result = (*outputMixObject)->Realize(outputMixObject, SL_BOOLEAN_FALSE);
+        assert(SL_RESULT_SUCCESS == result);
+        (void) result;
 
+        // get the environmental reverb interface
+        // this could fail if the environmental reverb effect is not available,
+        // either because the feature is not present, excessive CPU load, or
+        // the required MODIFY_AUDIO_SETTINGS permission was not requested and granted
+        /*result = (*outputMixObject)->GetInterface(outputMixObject, SL_IID_ENVIRONMENTALREVERB,
+                                                  &outputMixEnvironmentalReverb);
+        if (SL_RESULT_SUCCESS == result) {
+            result = (*outputMixEnvironmentalReverb)->SetEnvironmentalReverbProperties(
+                    outputMixEnvironmentalReverb, &reverbSettings);
+            (void)result;
+        }*/
+        // ignore unsuccessful result codes for environmental reverb, as it is optional for this example
+    }
     pthread_attr_t  threadAttr_;
 
     pthread_attr_init(&threadAttr_);
@@ -423,7 +425,7 @@ void Java_nl_vlessert_vigamup_PlayerService_createEngine(JNIEnv* env, jobject in
     g_ctx.PlayerServiceClz = (*env)->NewGlobalRef(env, clz);
     g_ctx.PlayerServiceObj = (*env)->NewGlobalRef(env, instance);
 
-    pthread_create(&t1,&threadAttr_,generateAudioThread,&g_ctx);
+    pthread_create(&t1,NULL,generateAudioThread,&g_ctx);
 
     /*jclass cls = (*env)->GetObjectClass(env, instance);
 
@@ -437,6 +439,7 @@ void Java_nl_vlessert_vigamup_PlayerService_createEngine(JNIEnv* env, jobject in
     queueBuffer2 = malloc(96000);
     queueBuffer3 = malloc(96000);
     queueBufferSilence = malloc(48000);
+    fullTrackWavebuf = NULL;
 
     wavebuf = malloc(48000 * sizeof(int16_t));
     wavebuf2 = malloc(96000);
@@ -447,94 +450,102 @@ void Java_nl_vlessert_vigamup_PlayerService_createBufferQueueAudioPlayer(JNIEnv*
                                                                            jclass clazz, jint sampleRate, jint bufSize) {
 
     SLresult result;
-    if (sampleRate >= 0 && bufSize >= 0) {
-        bqPlayerSampleRate = sampleRate * 1000;
+
+    if (!slesThingsCreated) {
+        if (sampleRate >= 0 && bufSize >= 0) {
+            bqPlayerSampleRate = sampleRate * 1000;
+            /*
+             * device native buffer size is another factor to minimize audio latency, not used in this
+             * sample: we only play one giant buffer here
+             */
+            //bqPlayerBufSize = bufSize;
+        }
+
+        // configure audio source
+        SLDataLocator_AndroidSimpleBufferQueue loc_bufq = {SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE,
+                                                           2};
+        SLDataFormat_PCM format_pcm = {SL_DATAFORMAT_PCM, 1, SL_SAMPLINGRATE_8,
+                                       SL_PCMSAMPLEFORMAT_FIXED_16, SL_PCMSAMPLEFORMAT_FIXED_16,
+                                       SL_SPEAKER_FRONT_CENTER, SL_BYTEORDER_LITTLEENDIAN};
         /*
-         * device native buffer size is another factor to minimize audio latency, not used in this
-         * sample: we only play one giant buffer here
+         * Enable Fast Audio when possible:  once we set the same rate to be the native, fast audio path
+         * will be triggered
          */
-        //bqPlayerBufSize = bufSize;
-    }
+        if (bqPlayerSampleRate) {
+            format_pcm.samplesPerSec = bqPlayerSampleRate;       //sample rate in mili second
+        }
+        SLDataSource audioSrc = {&loc_bufq, &format_pcm};
 
-    // configure audio source
-    SLDataLocator_AndroidSimpleBufferQueue loc_bufq = {SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, 2};
-    SLDataFormat_PCM format_pcm = {SL_DATAFORMAT_PCM, 1, SL_SAMPLINGRATE_8,
-                                   SL_PCMSAMPLEFORMAT_FIXED_16, SL_PCMSAMPLEFORMAT_FIXED_16,
-                                   SL_SPEAKER_FRONT_CENTER, SL_BYTEORDER_LITTLEENDIAN};
-    /*
-     * Enable Fast Audio when possible:  once we set the same rate to be the native, fast audio path
-     * will be triggered
-     */
-    if (bqPlayerSampleRate) {
-        format_pcm.samplesPerSec = bqPlayerSampleRate;       //sample rate in mili second
-    }
-    SLDataSource audioSrc = {&loc_bufq, &format_pcm};
+        // configure audio sink
+        SLDataLocator_OutputMix loc_outmix = {SL_DATALOCATOR_OUTPUTMIX, outputMixObject};
+        SLDataSink audioSnk = {&loc_outmix, NULL};
 
-    // configure audio sink
-    SLDataLocator_OutputMix loc_outmix = {SL_DATALOCATOR_OUTPUTMIX, outputMixObject};
-    SLDataSink audioSnk = {&loc_outmix, NULL};
+        /*
+         * create audio player:
+         *     fast audio does not support when SL_IID_EFFECTSEND is required, skip it
+         *     for fast audio case
+         */
+        const SLInterfaceID ids[3] = {SL_IID_BUFFERQUEUE, SL_IID_VOLUME, SL_IID_EFFECTSEND,
+                /*SL_IID_MUTESOLO,*/};
+        const SLboolean req[3] = {SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE,
+                /*SL_BOOLEAN_TRUE,*/ };
 
-    /*
-     * create audio player:
-     *     fast audio does not support when SL_IID_EFFECTSEND is required, skip it
-     *     for fast audio case
-     */
-    const SLInterfaceID ids[3] = {SL_IID_BUFFERQUEUE, SL_IID_VOLUME, SL_IID_EFFECTSEND,
-            /*SL_IID_MUTESOLO,*/};
-    const SLboolean req[3] = {SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE,
-            /*SL_BOOLEAN_TRUE,*/ };
-
-    result = (*engineEngine)->CreateAudioPlayer(engineEngine, &bqPlayerObject, &audioSrc, &audioSnk,
-                                                bqPlayerSampleRate ? 2 : 3, ids, req);
-    assert(SL_RESULT_SUCCESS == result);
-    (void) result;
-
-    // realize the player
-    result = (*bqPlayerObject)->Realize(bqPlayerObject, SL_BOOLEAN_FALSE);
-    assert(SL_RESULT_SUCCESS == result);
-    (void) result;
-
-    // get the play interface
-    result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_PLAY, &bqPlayerPlay);
-    assert(SL_RESULT_SUCCESS == result);
-    (void) result;
-
-    // get the buffer queue interface
-    result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_BUFFERQUEUE,
-                                             &bqPlayerBufferQueue);
-    assert(SL_RESULT_SUCCESS == result);
-    (void) result;
-
-    // register callback on the buffer queue
-    result = (*bqPlayerBufferQueue)->RegisterCallback(bqPlayerBufferQueue, bqPlayerCallback, NULL);
-    assert(SL_RESULT_SUCCESS == result);
-    (void) result;
-
-    // get the effect send interface
-    bqPlayerEffectSend = NULL;
-    if (0 == bqPlayerSampleRate) {
-        result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_EFFECTSEND,
-                                                 &bqPlayerEffectSend);
+        result = (*engineEngine)->CreateAudioPlayer(engineEngine, &bqPlayerObject, &audioSrc,
+                                                    &audioSnk,
+                                                    bqPlayerSampleRate ? 2 : 3, ids, req);
         assert(SL_RESULT_SUCCESS == result);
         (void) result;
-    }
+
+        // realize the player
+        result = (*bqPlayerObject)->Realize(bqPlayerObject, SL_BOOLEAN_FALSE);
+        assert(SL_RESULT_SUCCESS == result);
+        (void) result;
+
+        // get the play interface
+        result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_PLAY, &bqPlayerPlay);
+        assert(SL_RESULT_SUCCESS == result);
+        (void) result;
+
+        // get the buffer queue interface
+        result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_BUFFERQUEUE,
+                                                 &bqPlayerBufferQueue);
+        assert(SL_RESULT_SUCCESS == result);
+        (void) result;
+
+        // register callback on the buffer queue
+        result = (*bqPlayerBufferQueue)->RegisterCallback(bqPlayerBufferQueue, bqPlayerCallback,
+                                                          NULL);
+        assert(SL_RESULT_SUCCESS == result);
+        (void) result;
+
+        // get the effect send interface
+        bqPlayerEffectSend = NULL;
+        if (0 == bqPlayerSampleRate) {
+            result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_EFFECTSEND,
+                                                     &bqPlayerEffectSend);
+            assert(SL_RESULT_SUCCESS == result);
+            (void) result;
+        }
 
 #if 0   // mute/solo is not supported for sources that are known to be mono, as this is
-    // get the mute/solo interface
-    result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_MUTESOLO, &bqPlayerMuteSolo);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+        // get the mute/solo interface
+        result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_MUTESOLO, &bqPlayerMuteSolo);
+        assert(SL_RESULT_SUCCESS == result);
+        (void)result;
 #endif
 
-    // get the volume interface
-    result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_VOLUME, &bqPlayerVolume);
-    assert(SL_RESULT_SUCCESS == result);
-    (void) result;
+        // get the volume interface
+        result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_VOLUME, &bqPlayerVolume);
+        assert(SL_RESULT_SUCCESS == result);
+        (void) result;
 
-    // set the player's state to playing
-    result = (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
-    assert(SL_RESULT_SUCCESS == result);
-    (void) result;
+        // set the player's state to playing
+        result = (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
+        assert(SL_RESULT_SUCCESS == result);
+        (void) result;
+
+        slesThingsCreated = 1;
+    }
 }
 
 // shut down the native audio system
@@ -542,10 +553,10 @@ void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
 {
     __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown!!!");
 
-    //(*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_STOPPED);
-    //SLresult result = (*bqPlayerBufferQueue)->Clear(bqPlayerBufferQueue);
+    (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_STOPPED);
+    SLresult result = (*bqPlayerBufferQueue)->Clear(bqPlayerBufferQueue);
 
-    // destroy buffer queue audio player object, and invalidate all associated interfaces
+    /*// destroy buffer queue audio player object, and invalidate all associated interfaces
     if (bqPlayerObject != NULL) {
         (*bqPlayerObject)->Destroy(bqPlayerObject);
         bqPlayerObject = NULL;
@@ -556,18 +567,28 @@ void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
         bqPlayerVolume = NULL;
     }
 
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown2!!!");
+
     // destroy output mix object, and invalidate all associated interfaces
     if (outputMixObject != NULL) {
         (*outputMixObject)->Destroy(outputMixObject);
         outputMixObject = NULL;
-        //outputMixEnvironmentalReverb = NULL;
     }
+
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown3!!!");
 
     // destroy engine object, and invalidate all associated interfaces
     if (engineObject != NULL) {
         (*engineObject)->Destroy(engineObject);
         engineObject = NULL;
         engineEngine = NULL;
+    }
+     */
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown4!!!");
+
+    terminateThread = 1;
+    while (!threadTerminated) {
+        usleep(100);
     }
 
     free (fullTrackWavebuf);
@@ -577,12 +598,33 @@ void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
     free (queueBuffer2);
     free (queueBuffer3);
     free (queueBufferSilence);
-    terminateThread = 1;
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown5!!!");
 
     KSSPLAY_delete(kssplay);
     KSS_delete(kss);
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown6!!!");
+
+    secondsToGenerate = 0;
+    trackLength = 0;
+    initialDataCopied = 0;
+    generatingAllowed = 0;
+    currentFile = "";
+    queueSecond = 0;
+    secondsPlayed = 0;
+    isPlaying = 0;
+    isPaused = 1;
+    isBuffering = 0;
+    nextMessageSend = 0;
+    terminateThread = 0;
+    threadTerminated = 0;
+    loopTrack = 0;
+
+    previousSum = 0;
+
 
     pthread_mutex_destroy(&lock);
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown7!!!");
+
 }
 
 void investigateTrackFurther(int tracknr){

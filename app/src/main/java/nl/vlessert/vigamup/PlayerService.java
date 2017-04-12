@@ -27,6 +27,8 @@ import android.util.Log;
 import android.widget.RemoteViews;
 
 public class PlayerService extends Service{
+    private static final String NOTIFICATION_DELETED_ACTION = "NOTIFICATION_DELETED";
+
     private static final String LOG_TAG = "KSS PlayerService";
     private IBinder mBinder = new MyBinder();
     private boolean alreadyRunning = false;
@@ -61,10 +63,9 @@ public class PlayerService extends Service{
 
     private boolean randomizer = false;
     private Game currentGame;
-    private boolean fromActivity = false;
 
-    private boolean previousActionNext = false;
-    private boolean previousActionPrevious = false;
+
+    private String currentFile = "";
 
     static {
         System.loadLibrary("kss_player");
@@ -77,6 +78,7 @@ public class PlayerService extends Service{
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+
 
         //Log.i(LOG_TAG, "Received Intent " + intent.getAction());
         if (intent==null) {
@@ -162,6 +164,21 @@ public class PlayerService extends Service{
 
         return START_STICKY;
     }
+
+    private final BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            sendBroadcast(new Intent("shutdownActivity"));
+            Intent stopIntent = new Intent(PlayerService.this, PlayerService.class);
+            stopIntent.setAction(Constants.ACTION.STOPFOREGROUND_ACTION);
+            stopService(stopIntent);
+            stopForeground(true);
+            unregisterReceiver(this);
+            stopSelf();
+
+            shutdown();
+        }
+    };
 
     //The BroadcastReceiver that listens for bluetooth broadcasts
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
@@ -271,7 +288,12 @@ public class PlayerService extends Service{
 
     private void createNotification(){
         Log.i(LOG_TAG, "Received Start Foreground Intent ");
-        Intent notificationIntent = new Intent(this, MainActivity.class);
+        Intent notificationIntent = new Intent(this, PlayerService.class);
+
+        Intent intent = new Intent(NOTIFICATION_DELETED_ACTION);
+        PendingIntent pendingIntent2 = PendingIntent.getBroadcast(this, 0, intent, 0);
+        registerReceiver(receiver, new IntentFilter(NOTIFICATION_DELETED_ACTION));
+
         notificationIntent.setAction(Constants.ACTION.MAIN_ACTION);
 
         views = new RemoteViews(getPackageName(), R.layout.custom_notification);
@@ -340,7 +362,8 @@ public class PlayerService extends Service{
                 .setLargeIcon(
                         Bitmap.createScaledBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.default_album_art), 128, 128, false))
                 .setContentIntent(pendingIntent)
-                .setOngoing(true)
+                //.setOngoing(true)
+                .setAutoCancel(true)
                 .addAction(android.R.drawable.ic_media_previous,
                         "", ppreviousIntent)
                 .addAction(android.R.drawable.ic_media_play, "",
@@ -350,6 +373,7 @@ public class PlayerService extends Service{
                 .addAction(R.drawable.img_btn_repeat, "",
                         prepeatIntent)
                 .setContent(views)
+                .setDeleteIntent(pendingIntent2)
                 .setCustomBigContentView(bigViews);
 
         notification = mNotificationCompatBuilder.build();
@@ -390,7 +414,6 @@ public class PlayerService extends Service{
     }
 
     public void updateNotificationTitles(){
-        boolean randomizeOnlyWhenFromNotifcation = !fromActivity && randomizer;
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         Game game = gameCollection.getCurrentGame();
 
@@ -406,11 +429,6 @@ public class PlayerService extends Service{
         bigViews.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
 
         mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
-    }
-
-    public void setGameCollection(GameCollection gc){
-        hasGameCollection = true;
-        gameCollection = gc;
     }
 
     public void createGameCollection(){
@@ -504,14 +522,11 @@ public class PlayerService extends Service{
     }
 
     public void playCurrentTrack() {
-        fromActivity = true;
         Game game = gameCollection.getCurrentGame();
         setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
-        //sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
         updateNotificationTitles();
         updateA2DPInfo();
         setPlayingStatePlaying();
-        fromActivity = false;
         if (paused) paused = togglePlayback();
     }
 
@@ -522,7 +537,10 @@ public class PlayerService extends Service{
     public void setKssJava(String file){
         kssSet = true;
         kssTrackSet = false;
-        setKss(file);
+        if (!currentFile.equals(file)) {
+            setKss(file);
+            currentFile = file;
+        }
     }
 
     public void setKssTrackJava(int track, int length){
@@ -531,6 +549,7 @@ public class PlayerService extends Service{
         secondsPlayedFromCurrentTrack = 0;
         secondsBufferedFromCurrentTrack = 0;
         setKssTrack(track, length);
+        Log.d(LOG_TAG, "segfault hier al?!?!");
     }
 
     public void startPlayback(){
@@ -551,8 +570,8 @@ public class PlayerService extends Service{
         }
     }
     private void fixUninitialized(){
-        currentGame = gameCollection.getCurrentGame();
         if (!hasGameCollection) createGameCollection();
+        currentGame = gameCollection.getCurrentGame();
         if (!kssSet) {
             setKssJava(currentGame.musicFileC);
             setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
@@ -571,6 +590,10 @@ public class PlayerService extends Service{
         updateNotificationTitles();
         updateA2DPInfo();
         if (!paused) sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
+        if (paused) this.stopForeground(false);
+            else startForeground(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE,
+                notification);
+
     }
 
     private void repeatActivator(){
@@ -713,6 +736,11 @@ public class PlayerService extends Service{
 
                 @Override
                 public void onStop() {
+                    stopPlayback();
+                    kssSet = false;
+                    kssTrackSet = false;
+                    notificationPlaying = false;
+                    paused = true;
                     //Toast.makeText(getApplicationContext(), "Stop!!", Toast.LENGTH_LONG).show();
                     super.onStop();
                 }
@@ -739,8 +767,6 @@ public class PlayerService extends Service{
         updateA2DPPlayState(true);
         setKssProgress(progress);
     }
-
-    public boolean getRandomStatus(){ return randomizer; }
 
     public native void createEngine();
     public static native void createBufferQueueAudioPlayer(int sampleRate, int samplesPerBuf);
