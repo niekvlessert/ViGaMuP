@@ -92,7 +92,7 @@ void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
 {
     queueSecond = 1;
     generatingAllowed = 1;
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Callback called!!");
+    //__android_log_print(ANDROID_LOG_INFO, "KSS", "Callback called!!");
 }
 
 void nextTrack(void* context){

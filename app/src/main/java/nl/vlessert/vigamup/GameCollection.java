@@ -81,9 +81,14 @@ public class GameCollection {
         else activeGame--;
     }
 
-    public ArrayList<Game> getGameObjectsArrayList(){
-        //Log.d("KSS","test vanuit getGameObjectsArrayList: " + getCurrentGameName());
+    public ArrayList<Game> getGameObjects(){
+        //Log.d("KSS","test vanuit getGameObjects: " + getCurrentGameName());
         return gameObjects;
+    }
+
+    public ArrayList<Game> getGameObjectsWithTrackInformation(){
+        //Log.d("KSS","test vanuit getGameObjects: " + getCurrentGameName());
+        return gameObjectsWithTrackInformation;
     }
 
     public String getNextRandomGameAndTrack(){

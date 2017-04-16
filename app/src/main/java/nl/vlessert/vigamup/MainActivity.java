@@ -6,6 +6,7 @@ import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
@@ -17,6 +18,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Point;
 import android.graphics.PorterDuff;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -24,10 +26,12 @@ import android.os.IBinder;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.content.ContextCompat;
-import android.text.Html;
+import android.support.v7.app.AlertDialog;
 import android.util.Log;
+import android.view.TouchDelegate;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -82,9 +86,10 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
     String currentShowedGameTitle = "";
 
-    boolean expanded = false;
+    //boolean expanded = false;
 
     private SeekBar seekBar = null;
+    private LinearLayout logoLayout2 = null;
 
     private BroadcastReceiver receiver;
     private IntentFilter filter;
@@ -101,6 +106,15 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
     private boolean globalSetNewKss = false;
 
+    private ImageButton ib;
+
+    Long downloadReference;
+
+    private boolean gamesShowing = false;
+
+    private boolean rebuildMusicList = false;
+    private boolean firstRun = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -113,6 +127,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         setSupportActionBar(toolbar);
 
         Log.d(LOG_TAG,"In onCreate....");
+
         Intent startIntent = new Intent(MainActivity.this, PlayerService.class);
         startIntent.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
         startService(startIntent);
@@ -128,17 +143,15 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 window.setStatusBarColor(ContextCompat.getColor(MainActivity.this.getApplicationContext(), R.color.colorPrimaryDark));*/ // todo....
                 //Log.i(LOG_TAG, "onPanelSlide, offset " + slideOffset);
                 //ImageView ivImage=(ImageView)findViewById(R.id.logo);
-                LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
+                /*LinearLayout topPlayerBarLayout = (LinearLayout) findViewById(R.id.logoLayout);
                 if (slideOffset > 0.01 && !expanded) {
-                    ivLayout.setVisibility(LinearLayout.GONE);
                     Log.d(LOG_TAG, "hide...");
                     expanded = true;
                 }
                 if (slideOffset < 0.02 && expanded) {
-                    ivLayout.setVisibility(LinearLayout.VISIBLE);
                     Log.d(LOG_TAG, "back...");
                     expanded = false;
-                }
+                }*/
             }
 
             @Override
@@ -153,9 +166,24 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             }
         });
 
+        ib = (ImageButton)findViewById(R.id.playerTopLayoutPlayButton);
+        ib.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                // TODO Auto-generated method stub
+                Log.v("ImageButton", "Clicked!");
+                mPlayerService.togglePlaybackJava();
+                setPlayButtonInPlayerBar();
+            }
+        });
+
         //gameLogoView = (ImageView) findViewById(R.id.logo);
 
+        logoLayout2 = (LinearLayout) findViewById(R.id.logoLayout2);
         seekBar = (SeekBar) findViewById(R.id.seekBar);
+        increaseClickArea(logoLayout2, seekBar);
+
         seekBar.getProgressDrawable().setColorFilter(0xffffffff, PorterDuff.Mode.MULTIPLY);
 
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -196,6 +224,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         filter.addAction("setSeekBarThumbProgress");
         filter.addAction("resetSeekBar");
         filter.addAction("setSlidingUpPanelWithGame");
+        filter.addAction("setPlayButtonInPlayerBar");
         filter.addAction("shutdownActivity");
         filter.addAction(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
 
@@ -216,10 +245,13 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     bufferBarProgress = 2; // 2 seconds buffered always in advance...
                     seekBarThumbProgress = 0;
                     seekBar.setProgress(0);*/
-                    LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
-                    ivLayout.setVisibility(LinearLayout.GONE);
+                    setTrackInfoInPlayerBar();
+                    setPlayButtonInPlayerBar();
                     initialized = true;
                     showGame(false);
+                }
+                if (intent.getAction().equals("setPlayButtonInPlayerBar")){
+                    setPlayButtonInPlayerBar();
                 }
                 if (intent.getAction().equals(DownloadManager.ACTION_DOWNLOAD_COMPLETE)){
                     Log.d(LOG_TAG, "Download event!!: " + intent.getAction());
@@ -230,9 +262,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                         getApplicationContext().unbindService(mServiceConnection);
                     } catch (IllegalArgumentException iae) {
                     }
-                    Intent stopIntent = new Intent(MainActivity.this, PlayerService.class);
-                    stopIntent.setAction(Constants.ACTION.STOPFOREGROUND_ACTION);
-                    startService(stopIntent);
                     try {
                         getApplicationContext().unregisterReceiver(receiver);
                     } catch (IllegalArgumentException iae) {
@@ -253,22 +282,36 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         super.onResume();
         Log.d(LOG_TAG,"onResume!!");
         registerReceiver(receiver, filter);
-        if (mServiceBound) {
-            gameCollection = mPlayerService.gameCollection;
-            Game game = gameCollection.getCurrentGame();
-            TextView tv = (TextView) findViewById(R.id.playerTopLayoutName);
-            tv.setText(Html.fromHtml("<b>"+game.getTitle()+"</b><br/>"+game.getCurrentTrackTitle()));
-            seekBar.setMax(game.getCurrentTrackLength());
-            bufferBarProgress = 2; // 2 seconds buffered always in advance...
-            seekBarThumbProgress = 0;
-            seekBar.setProgress(0);
-            Log.d(LOG_TAG, "Game in onresume: " + game.title + " " + game.position);
-            if (!game.getTitle().equals(currentShowedGameTitle)) showGame(false);
-            //LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
-            //ViewGroup.LayoutParams params = ivLayout.getLayoutParams();
-            //ivLayout.setVisibility(LinearLayout.GONE);
-            //params.height = 0;
-            //ivLayout.setLayoutParams(params);
+        if (!firstRun) {
+            if (mServiceBound) {
+                if (rebuildMusicList) {
+                    rebuildMusicList = false;
+                    mPlayerService.createGameCollection();
+                }
+                gameCollection = mPlayerService.gameCollection;
+                if (!gamesShowing) showMusicList();
+                Game game = gameCollection.getCurrentGame();
+
+                setTrackInfoInPlayerBar();
+                setPlayButtonInPlayerBar();
+
+                seekBar.setMax(game.getCurrentTrackLength());
+                bufferBarProgress = 2; // 2 seconds buffered always in advance...
+                seekBarThumbProgress = 0;
+                seekBar.setProgress(0);
+                Log.d(LOG_TAG, "Game in onresume: " + game.title + " " + game.position);
+                if (!game.getTitle().equals(currentShowedGameTitle)) showGame(false);
+                //LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
+                //ViewGroup.LayoutParams params = ivLayout.getLayoutParams();
+                //ivLayout.setVisibility(LinearLayout.GONE);
+                //params.height = 0;
+                //ivLayout.setLayoutParams(params);
+            } else {
+                Intent startIntent = new Intent(MainActivity.this, PlayerService.class);
+                startIntent.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
+                startService(startIntent);
+                bindService(startIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
+            }
         }
     }
 
@@ -312,11 +355,10 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             mPlayerService = myBinder.getService();
             mServiceBound = true;
 
-            LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
-            ivLayout.setVisibility(LinearLayout.GONE);
             gameCollection = mPlayerService.gameCollection;
             if (!gameListShowing){
-                showMusicList(gameList);
+                showMusicList();
+                Log.d(LOG_TAG, "show music list from onserviceconncet");
                 gameListShowing = true;
             }
             if (!mPlayerService.isPaused()) {
@@ -327,6 +369,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 seekBar.setProgress(0);
                 Log.d(LOG_TAG, "Game in activity: " + game.title + " " + game.position);
                 initialized = true;
+                setPlayButtonInPlayerBar();
+                setTrackInfoInPlayerBar();
                 showGame(false);
             }
         }
@@ -346,7 +390,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 //Toast.makeText(getApplicationContext(), "Item 1 Selected", Toast.LENGTH_LONG).show();
                 return true;
             case R.id.download_music:
-                Toast.makeText(getApplicationContext(), "Open a ViGaMuP music collection site on some PC...", Toast.LENGTH_LONG).show();
                 downloadMusic();
                 return true;
             case R.id.about:
@@ -374,27 +417,35 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     Log.d(LOG_TAG, barcode.displayValue);
                     //mResultTextView.setText(barcode.displayValue);
                     Toast.makeText(getApplicationContext(), "Downloading " + barcode.displayValue + "...", Toast.LENGTH_LONG).show();
-                    if(barcode.displayValue.contains("__ViGaMuP[")) {
+                    if(barcode.displayValue.contains("vigamup_")) {
                         Intent intent = getIntent();
                         Uri Download_Uri = Uri.parse(barcode.displayValue);
                         DownloadManager.Request request = new DownloadManager.Request(Download_Uri);
                         request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
                         request.setAllowedOverRoaming(false);
                         request.setTitle(intent.getStringExtra(barcode.displayValue));
-                        String fileType = barcode.displayValue.substring(barcode.displayValue.indexOf("[") + 1, barcode.displayValue.indexOf("]"));
+                        String fileName = barcode.displayValue.substring(barcode.displayValue.lastIndexOf("/")+1);
+                        int position1 = fileName.indexOf("_") + 1;
+                        int position2 =  fileName.indexOf("_", position1);
+                        String fileType = fileName.substring(position1, position2);
                         Log.d(LOG_TAG,fileType);
-                        if (fileType.equals("KSS")) {
-                            String fileName = barcode.displayValue.substring(barcode.displayValue.lastIndexOf("_")+1, barcode.displayValue.length());
+                        if (fileType.equals("kss")) {
+                            fileName = barcode.displayValue.substring(barcode.displayValue.lastIndexOf("_")+1, barcode.displayValue.length());
                             Log.d(LOG_TAG,"Filename: "+ fileName);
                             if (directoryExists("ViGaMuP/KSS/" + fileName)) deleteDirectory("ViGaMuP/KSS/" + fileName);
                             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,"ViGaMuP/KSS/" + fileName);
-                            Long downloadReference = downloadManager.enqueue(request);
+
+                            downloadReference = downloadManager.enqueue(request);
                         } else {
                             Log.d(LOG_TAG,"Toast to report this is not a ViGaMuP file...");
                         }
                         //Enqueue a new download and same the referenceId
                     } else {
                         Log.d(LOG_TAG,"Toast to report this is not a ViGaMuP file...");
+                        /*Uri Download_Uri = Uri.parse(barcode.displayValue);
+                        DownloadManager.Request request = new DownloadManager.Request(Download_Uri);
+                        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,"ViGaMuP/KSS/test.zip");
+                        downloadReference = downloadManager.enqueue(request);*/
                     }
                 }
             } else Log.e(LOG_TAG, String.format(getString(R.string.barcode_error_format),
@@ -418,6 +469,19 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         return false;
     }
 
+    private void setTrackInfoInPlayerBar(){
+        Game game = gameCollection.getCurrentGame();
+        TextView tn = (TextView) findViewById(R.id.playerTopLayoutTrackName);
+        tn.setText(game.getCurrentTrackTitle());
+        TextView gn = (TextView) findViewById(R.id.playerTopLayoutGameName);
+        gn.setText(game.getTitle());
+    }
+
+    private void setPlayButtonInPlayerBar(){
+        if (mPlayerService.getPaused()) ib.setImageResource(android.R.drawable.ic_media_play);
+        else ib.setImageResource(android.R.drawable.ic_media_pause);
+    }
+
     private void unpackDownloadedFile(Context context, Intent intent){
         Log.d(LOG_TAG,"Download event!!!!");
         String action = intent.getAction();
@@ -427,6 +491,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             DownloadManager manager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
 
             DownloadManager.Query q = new DownloadManager.Query();
+            q.setFilterById(downloadReference);
             Cursor c = manager.query(q);
 
             if (c.moveToFirst()) {
@@ -442,12 +507,20 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     } catch (IOException test) {
                         Log.d(LOG_TAG, "Unzip error... very weird");
                     }
-                    //finish();
-                    //startActivity(getIntent());
-                    if (checkForMusicAndInitialize()) {
-                        gameCollection.createGameCollection();
-                        showMusicList(gameList);
+                    if (mPlayerService == null) {
+                        Intent startIntent = new Intent(MainActivity.this, PlayerService.class);
+                        startIntent.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
+                        startService(startIntent);
+                        bindService(startIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
+                        rebuildMusicList = true;
+                        return;
                     }
+                    if (checkForMusicAndInitialize()) {
+                        mPlayerService.createGameCollection();
+                        gamesShowing=false;
+                        showMusicList();
+                    }
+                    Toast.makeText(getApplicationContext(), "Download completed...", Toast.LENGTH_LONG).show();
                 } else {
                     Log.i(LOG_TAG, "Download failed!");
                     Toast.makeText(getApplicationContext(), "Download failed... try again", Toast.LENGTH_LONG).show();
@@ -512,16 +585,19 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 makeDirectory("ViGaMuP");
                 makeDirectory("ViGaMuP/KSS");
             }
-            Toast.makeText(getApplicationContext(), "No music found... open a ViGaMuP music collection site on some PC...", Toast.LENGTH_LONG).show();
+            firstRun = true;
             downloadMusic();
             return false;
         }
     }
 
-    private void showMusicList(GameList gameList){
+    private void showMusicList(){
+        gameCollection = mPlayerService.gameCollection;
         FragmentManager fragmentManager = this.getSupportFragmentManager();
         gameList = (GameList) fragmentManager.findFragmentById(R.id.fragment1);
-        gameList.updateGameList(gameCollection.getGameObjectsArrayList());
+        gameList.updateGameList(gameCollection.getGameObjectsWithTrackInformation());
+        Log.d(LOG_TAG,"Show music list...");
+        gamesShowing = true;
     }
 
     @Override
@@ -538,9 +614,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         Game game = gameCollection.getCurrentGame();
         Log.d("KSS", "game " + game.getTitle());
         currentShowedGameTitle = game.getTitle();
-
-        TextView tv = (TextView) findViewById(R.id.playerTopLayoutName);
-        tv.setText(Html.fromHtml("<b>"+game.getTitle()+"</b><br/>"+game.getCurrentTrackTitle()));
 
         View header, header2;
         boolean gameLogoImageFound = true;
@@ -590,8 +663,9 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     globalSetNewKss = false;
                 }
                 game.setTrack(position-1);
+                setTrackInfoInPlayerBar();
 
-                new Thread(new Runnable() {
+                Thread t = new Thread(new Runnable() {
                     public void run() {
                         Game game = gameCollection.getCurrentGame();
                         seekBar.setMax(game.getCurrentTrackLength());
@@ -600,7 +674,13 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                         seekBar.setProgress(0);
                         mPlayerService.playCurrentTrack();
                     }
-                }).start();
+                });
+
+                t.start();
+                try { t.join(); } catch (InterruptedException ie){}
+
+                setPlayButtonInPlayerBar();
+
             }
         });
 
@@ -700,9 +780,53 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     private void downloadMusic(){
         Log.d(LOG_TAG,"Initialize barcode scanner...");
 
+        String message = "";
+        if (firstRun) message = "You don't have any music! ";
+        message += "Visit vigamup.tk with your PC to get some QR codes to get yourself some music! Click OK to open the QR code scanner...";
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        Intent intent = new Intent(getApplicationContext(), BarcodeCaptureActivity.class);
+                        startActivityForResult(intent, BARCODE_READER_REQUEST_CODE);
+                        //do things
+                    }
+                });
+        AlertDialog alert = builder.create();
 
-        Intent intent = new Intent(getApplicationContext(), BarcodeCaptureActivity.class);
-        startActivityForResult(intent, BARCODE_READER_REQUEST_CODE);
+        alert.show();
+    }
+
+    public static void increaseClickArea(View parent, View child) {
+
+        // increase the click area with delegateArea, can be used in + create
+        // icon
+        final View chicld = child;
+        parent.post(new Runnable() {
+            public void run() {
+                // Post in the parent's message queue to make sure the
+                // parent
+                // lays out its children before we call getHitRect()
+                Rect delegateArea = new Rect();
+                View delegate = chicld;
+                delegate.getHitRect(delegateArea);
+                delegateArea.top -= 100;
+                delegateArea.bottom += 100;
+                delegateArea.left -= 100;
+                delegateArea.right += 100;
+                TouchDelegate expandedArea = new TouchDelegate(delegateArea,
+                        delegate);
+                // give the delegate to an ancestor of the view we're
+                // delegating the
+                // area to
+                if (View.class.isInstance(delegate.getParent())) {
+                    ((View) delegate.getParent())
+                            .setTouchDelegate(expandedArea);
+                }
+            }
+        });
+
     }
 
     private void setBufferBarProgress(int bufferBarProgress){

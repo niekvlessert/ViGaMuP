@@ -64,6 +64,7 @@ public class PlayerService extends Service{
     private boolean randomizer = false;
     private Game currentGame;
 
+    private boolean justStarted = true;
 
     private String currentFile = "";
 
@@ -210,6 +211,7 @@ public class PlayerService extends Service{
     @Override
     public void onDestroy() {
         super.onDestroy();
+        unregisterReceiver(receiver);
         unregisterReceiver(mReceiver);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             if (mMediaSession!=null) mMediaSession.release();
@@ -288,7 +290,7 @@ public class PlayerService extends Service{
 
     private void createNotification(){
         Log.i(LOG_TAG, "Received Start Foreground Intent ");
-        Intent notificationIntent = new Intent(this, PlayerService.class);
+        Intent notificationIntent = new Intent(this, MainActivity.class);
 
         Intent intent = new Intent(NOTIFICATION_DELETED_ACTION);
         PendingIntent pendingIntent2 = PendingIntent.getBroadcast(this, 0, intent, 0);
@@ -584,16 +586,22 @@ public class PlayerService extends Service{
     public void togglePlaybackJava(){
         fixUninitialized();
 
+        if (repeatMode == Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM && justStarted){
+            nextTrack();
+            justStarted = false;
+        }
+
         paused = togglePlayback();
         if (paused) setPlayingStatePause(); else setPlayingStatePlaying();
         Log.d("KSS","togglePlaybackJava...: " + notificationPlaying);
+
         updateNotificationTitles();
         updateA2DPInfo();
         if (!paused) sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
+        sendBroadcast(new Intent("setPlayButtonInPlayerBar"));
         if (paused) this.stopForeground(false);
             else startForeground(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE,
                 notification);
-
     }
 
     private void repeatActivator(){
@@ -766,6 +774,10 @@ public class PlayerService extends Service{
         secondsPlayedFromCurrentTrack = progress;
         updateA2DPPlayState(true);
         setKssProgress(progress);
+    }
+
+    public boolean getPaused(){
+        return paused;
     }
 
     public native void createEngine();
