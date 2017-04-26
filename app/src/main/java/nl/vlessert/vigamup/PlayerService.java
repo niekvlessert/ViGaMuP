@@ -109,10 +109,16 @@ public class PlayerService extends Service{
 
             String message = "Focus request " + (mFocusGranted ? "granted" : "failed");
             Log.i(LOG_TAG, message);
-            String nativeParam = myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
-            sampleRate = Integer.parseInt(nativeParam);
-            nativeParam = myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
-            bufSize = Integer.parseInt(nativeParam);
+
+            if(Build.VERSION.SDK_INT > Build.VERSION_CODES.JELLY_BEAN) {
+                sampleRate = Integer.parseInt(myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE));
+                bufSize = Integer.parseInt(myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER));
+                Log.d(LOG_TAG, "samplerate " + sampleRate + "bufzei " + bufSize);
+            } else {
+                sampleRate = 48000;
+                bufSize = 240;
+            }
+
 
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP){
                 if (mMediaSession == null) {
@@ -192,8 +198,8 @@ public class PlayerService extends Service{
                 Log.d(LOG_TAG, "Device found"); //
             }
             else if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
-                Log.d(LOG_TAG, "Device connected"); //
-                if (paused) updateA2DPPlayState(false);
+                Log.d(LOG_TAG, "Device connected");
+                if (paused) updateA2DPPlayState(false); // car audio systeme will start playback (in my case...)
             }
             else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 Log.d(LOG_TAG, "Done searching"); //
@@ -211,8 +217,8 @@ public class PlayerService extends Service{
     @Override
     public void onDestroy() {
         super.onDestroy();
-        unregisterReceiver(receiver);
-        unregisterReceiver(mReceiver);
+        try { unregisterReceiver(receiver);} catch (IllegalArgumentException iae){}
+        try { unregisterReceiver(mReceiver);} catch (IllegalArgumentException iae){}
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             if (mMediaSession!=null) mMediaSession.release();
         }
@@ -347,13 +353,13 @@ public class PlayerService extends Service{
         bigViews.setImageViewResource(R.id.status_bar_play,
                 android.R.drawable.ic_media_play);
 
-        views.setTextViewText(R.id.status_bar_track_name, "Song Title");
-        bigViews.setTextViewText(R.id.status_bar_track_name, "Song Title");
+        views.setTextViewText(R.id.status_bar_track_name, "");
+        bigViews.setTextViewText(R.id.status_bar_track_name, "");
 
-        views.setTextViewText(R.id.status_bar_artist_name, "Artist Name");
-        bigViews.setTextViewText(R.id.status_bar_artist_name, "Artist Name");
+        views.setTextViewText(R.id.status_bar_artist_name, "");
+        bigViews.setTextViewText(R.id.status_bar_artist_name, "");
 
-        bigViews.setTextViewText(R.id.status_bar_album_name, "Album Name");
+        bigViews.setTextViewText(R.id.status_bar_album_name, "");
 
         mNotificationCompatBuilder = new NotificationCompat.Builder(this)
                 .setContentTitle("")
@@ -613,16 +619,16 @@ public class PlayerService extends Service{
                 randomizer = false;
                 bigViews.setImageViewResource(R.id.status_bar_repeat,
                         R.drawable.img_btn_repeat_pressed);
-                bigViews.setTextViewText(R.id.status_bar_track_name,"Repeat mode 1 activated: loop current track");
+                bigViews.setTextViewText(R.id.status_bar_track_name,"Repeat 1: loop current track (if supported, from next track)");
                 repeatMode = Constants.REPEAT_MODES.LOOP_TRACK;
                 mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
-                //setKssLoopMode(true);
+                toggleLoopTrack();
                 handler.postDelayed(new MyRunnable(game), 3000);
                 break;
             case Constants.REPEAT_MODES.LOOP_TRACK :
                 repeatMode = Constants.REPEAT_MODES.LOOP_GAME;
-                bigViews.setTextViewText(R.id.status_bar_track_name,"Repeat mode 2: loop current game/collection");
-                //setKssLoopMode(false);
+                bigViews.setTextViewText(R.id.status_bar_track_name,"Repeat 2: loop current game/collection");
+                toggleLoopTrack();
                 mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
                 handler.postDelayed(new MyRunnable(game), 3000);
                 break;
@@ -631,13 +637,13 @@ public class PlayerService extends Service{
                 repeatMode = Constants.REPEAT_MODES.SHUFFLE_IN_GAME;
                 bigViews.setImageViewResource(R.id.status_bar_repeat,
                         R.drawable.img_btn_shuffle_pressed);
-                bigViews.setTextViewText(R.id.status_bar_track_name,"Shuffle mode 1: shuffle current game/collection");
+                bigViews.setTextViewText(R.id.status_bar_track_name,"Shuffle 1: shuffle current game/collection");
                 mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
                 handler.postDelayed(new MyRunnable(game), 3000);
                 break;
             case Constants.REPEAT_MODES.SHUFFLE_IN_GAME :
                 repeatMode = Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM;
-                bigViews.setTextViewText(R.id.status_bar_track_name,"Shuffle mode 2: shuffle in current platform");
+                bigViews.setTextViewText(R.id.status_bar_track_name,"Shuffle 2: shuffle in current platform");
                 mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
                 handler.postDelayed(new MyRunnable(game), 3000);
                 break;
@@ -785,6 +791,7 @@ public class PlayerService extends Service{
     public static native void setKss(String file);
     public static native void setKssTrack(int track, int length);
     public static native boolean togglePlayback();
+    public static native boolean toggleLoopTrack();
     public native void setKssProgress(int progress);
     public native void shutdown();
 

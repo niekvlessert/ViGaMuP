@@ -51,6 +51,8 @@ int nextMessageSend = 0;
 int terminateThread = 0;
 int threadTerminated = 0;
 int loopTrack = 0;
+int loopTrackWasEnabled = 0;
+int skipToNextTrack = 0;
 
 int slesThingsCreated = 0;
 
@@ -127,6 +129,7 @@ int checkForSilence(int16_t* queueBuffer){
     }
     __android_log_print(ANDROID_LOG_INFO, "KSS", "Silence!!");
     previousSum=0;
+    skipToNextTrack = 1; // for loop mode
     return 1;
 }
 
@@ -140,7 +143,7 @@ int queueSecondIfRequired(void *context){
             queueBufferToUse++;
             secondsPlayed++;
             (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, 96000);
-            if (checkForSilence(queueBufferSilence)) secondsPlayed=trackLength; // force next Track...
+            if (checkForSilence(queueBufferSilence)) secondsPlayed=trackLength; // force next track for normal playback
         } else {
             if (queueBufferToUse == 2 && queueSecond != 0) {
                 //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
@@ -189,6 +192,16 @@ void* generateAudioThread(void* context){
     while(1)
     {
         if (!loopTrack) {
+
+            if (loopTrackWasEnabled) { //fade to next track..
+                initialDataCopied = 1;
+                secondsToGenerate = 2;
+                generatingAllowed = 1;
+                loopTrackWasEnabled = 0;
+                terminateThread = 0;
+                secondsPlayed = trackLength - 2;
+            }
+
             isBuffering = 1;
 
             while (secondsToGenerate > 0 && generatingAllowed == 1 && isPlaying &&
@@ -207,7 +220,7 @@ void* generateAudioThread(void* context){
                 if (secondsToGenerate == 1)
                     KSSPLAY_fade_start(kssplay, 1000); //todo: only fade when song loops...
                 queueSecondResult = queueSecondIfRequired(context);
-                // __android_log_print(ANDROID_LOG_INFO, "KSS", "secondsPlayed: %d, trackLength: %d", secondsPlayed, trackLength);
+                //__android_log_print(ANDROID_LOG_INFO, "KSS", "Aha, in play routine!!! stg: %d",secondsToGenerate);
                 if (queueSecondResult == 1)
                     (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
                 nextMessageSend = 0;
@@ -227,24 +240,31 @@ void* generateAudioThread(void* context){
         } else {
             if (isPlaying) {
                 while (loopTrack) {
-                    if (queueBufferToUse == 1) {
-                        KSSPLAY_calc(kssplay, queueBuffer1, 48000);
-                        KSSPLAY_calc(kssplay, queueBuffer2, 48000);
-                        KSSPLAY_calc(kssplay, queueBuffer3, 48000);
-                        (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, 96000);
-                        queueBufferToUse++;
-                    } else {
-                        if (queueBufferToUse == 2) {
-                            (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer2,
-                                                            96000);
+                    loopTrackWasEnabled = 1;
+                    if (queueSecond) {
+                        queueSecond = 0;
+                        if (skipToNextTrack) {
+                            __android_log_print(ANDROID_LOG_INFO, "KSS", "Skip to next called...");
+                            skipToNextTrack = 0;
+                            (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, nextTrackId);
+                        }
+                        if (queueBufferToUse == 1) {
+                            KSSPLAY_calc(kssplay, queueBuffer1, 48000);
+                            (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, 96000);
                             queueBufferToUse++;
+                            checkForSilence(queueBuffer1);
                         } else {
-                            (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer3,
-                                                            96000);
-                            queueBufferToUse = 1;
+                            if (queueBufferToUse == 2) {
+                                KSSPLAY_calc(kssplay, queueBuffer2, 48000);
+                                (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer2, 96000);
+                                queueBufferToUse++;
+                            } else {
+                                KSSPLAY_calc(kssplay, queueBuffer3, 48000);
+                                (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer3, 96000);
+                                queueBufferToUse=1;
+                            }
                         }
                     }
-                    sleep(1);
                 }
             }
         }
@@ -324,6 +344,17 @@ jboolean Java_nl_vlessert_vigamup_PlayerService_togglePlayback(JNIEnv* env, jcla
     }
 }
 
+jboolean Java_nl_vlessert_vigamup_PlayerService_toggleLoopTrack(JNIEnv* env, jclass clazz) {
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Paused status!!: %d", isPaused);
+    if (loopTrack) {
+        loopTrack = 0;
+        return 0;
+    } else {
+        loopTrack = 1;
+        return 1;
+    }
+}
+
 void Java_nl_vlessert_vigamup_PlayerService_setKssTrack(JNIEnv* env, jclass clazz, int trackNr, int secondsToPlay){
     secondsToGenerate = 0;
     trackLength = 0;
@@ -348,21 +379,20 @@ void Java_nl_vlessert_vigamup_PlayerService_setKssTrack(JNIEnv* env, jclass claz
         //(*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
         pthread_mutex_unlock(&lock);
     }
-
     KSSPLAY_reset(kssplay, trackNr, 0);
     secondsToGenerate = secondsToPlay;
     if (secondsToPlay==1) secondsToPlay=3;
     trackLength = secondsToPlay;
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Komt ie hier?!?!? %d", (int)sizeof(fullTrackWavebuf));
+    //__android_log_print(ANDROID_LOG_INFO, "KSS", "Komt ie hier?!?!? %d", (int)sizeof(fullTrackWavebuf));
     if (fullTrackWavebuf!=NULL) free(fullTrackWavebuf);
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Hier dan?!?!? %d ", secondsToPlay);
+    //__android_log_print(ANDROID_LOG_INFO, "KSS", "Hier dan?!?!? %d ", secondsToPlay);
     fullTrackWavebuf = malloc(96000 * secondsToPlay);
     KSSPLAY_calc(kssplay, wavebuf, 48000);
     KSSPLAY_calc(kssplay, wavebuf2, 48000);
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Of hier....");
+    //__android_log_print(ANDROID_LOG_INFO, "KSS", "Of hier....");
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf, 96000);
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf2, 96000);
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "En hier?!?!?");
+    //__android_log_print(ANDROID_LOG_INFO, "KSS", "En hier?!?!?");
     isPlaying = 1;
 }
 
@@ -448,6 +478,8 @@ void Java_nl_vlessert_vigamup_PlayerService_createEngine(JNIEnv* env, jobject in
 // create buffer queue audio player
 void Java_nl_vlessert_vigamup_PlayerService_createBufferQueueAudioPlayer(JNIEnv* env,
                                                                            jclass clazz, jint sampleRate, jint bufSize) {
+
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Creating the stuff...");
 
     SLresult result;
 
@@ -553,10 +585,10 @@ void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
 {
     __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown!!!");
 
-    (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_STOPPED);
-    SLresult result = (*bqPlayerBufferQueue)->Clear(bqPlayerBufferQueue);
+    //(*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_STOPPED);
+    //SLresult result = (*bqPlayerBufferQueue)->Clear(bqPlayerBufferQueue);
 
-    /*// destroy buffer queue audio player object, and invalidate all associated interfaces
+    // destroy buffer queue audio player object, and invalidate all associated interfaces
     if (bqPlayerObject != NULL) {
         (*bqPlayerObject)->Destroy(bqPlayerObject);
         bqPlayerObject = NULL;
@@ -583,7 +615,7 @@ void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
         engineObject = NULL;
         engineEngine = NULL;
     }
-     */
+
     __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown4!!!");
 
     terminateThread = 1;

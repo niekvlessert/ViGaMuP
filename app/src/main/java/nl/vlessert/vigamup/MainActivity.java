@@ -20,6 +20,7 @@ import android.graphics.Point;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.IBinder;
@@ -29,6 +30,8 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.TouchDelegate;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ImageButton;
@@ -115,12 +118,24 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     private boolean rebuildMusicList = false;
     private boolean firstRun = false;
 
+    private boolean serviceDestroyed = false;
+
+    Window window;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        window = getWindow();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+        }
+
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        toolbar.setTitleTextColor(Color.WHITE);
+        toolbar.setSubtitleTextColor(Color.WHITE);
 
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
@@ -143,8 +158,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 window.setStatusBarColor(ContextCompat.getColor(MainActivity.this.getApplicationContext(), R.color.colorPrimaryDark));*/ // todo....
                 //Log.i(LOG_TAG, "onPanelSlide, offset " + slideOffset);
                 //ImageView ivImage=(ImageView)findViewById(R.id.logo);
-                /*LinearLayout topPlayerBarLayout = (LinearLayout) findViewById(R.id.logoLayout);
-                if (slideOffset > 0.01 && !expanded) {
+                //LinearLayout topPlayerBarLayout = (LinearLayout) findViewById(R.id.logoLayout);
+                /*if (slideOffset > 0.01 && !expanded) {
                     Log.d(LOG_TAG, "hide...");
                     expanded = true;
                 }
@@ -152,6 +167,12 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     Log.d(LOG_TAG, "back...");
                     expanded = false;
                 }*/
+                if (slideOffset > 0.5) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) { window.setStatusBarColor(Color.BLACK); }
+                }
+                if (slideOffset <= 0.5) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) { window.setStatusBarColor(ContextCompat.getColor(MainActivity.this.getApplicationContext(), R.color.colorPrimaryDark)); }
+                }
             }
 
             @Override
@@ -258,6 +279,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     unpackDownloadedFile(context, intent);
                 }
                 if (intent.getAction().equals("shutdownActivity")) {
+                    serviceDestroyed = true;
                     try {
                         getApplicationContext().unbindService(mServiceConnection);
                     } catch (IllegalArgumentException iae) {
@@ -331,6 +353,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){Log.d(LOG_TAG, "error in destroy: " + iae);}        //Process.killProcess(Process.myPid());
         mServiceConnection = null;
         Log.d(LOG_TAG,"onDestory!!: " + isMyServiceRunning(PlayerService.class));
+        if (serviceDestroyed) android.os.Process.killProcess(android.os.Process.myPid());
     }
 
     @Override
@@ -395,6 +418,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             case R.id.about:
                 return true;
             case R.id.exit:
+                serviceDestroyed = true;
                 try {this.getApplicationContext().unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
                 Intent stopIntent = new Intent(MainActivity.this, PlayerService.class);
                 stopIntent.setAction(Constants.ACTION.STOPFOREGROUND_ACTION);
@@ -504,6 +528,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     File targetDirectory = new File(name.substring(0, name.lastIndexOf("/")));
                     try {
                         unzip(file, targetDirectory);
+                        boolean deleted = file.delete();
                     } catch (IOException test) {
                         Log.d(LOG_TAG, "Unzip error... very weird");
                     }

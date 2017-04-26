@@ -22,8 +22,8 @@
         by AppBaseTheme from res/values-vXX/styles.xml on newer devices.
     -->
     <style name="AppBaseTheme" parent="Theme.AppCompat.Light.NoActionBar">
-        <item name="colorPrimary">#ffff9431</item>
-        <item name="colorPrimaryDark">#ffD56600</item>
+        <item name="colorPrimary">#001bba</item>
+        <item name="colorPrimaryDark">#001bba</item>
         <!--
             Theme customizations available in newer API levels can go in
             res/values-vXX/styles.xml, while customizations related to
@@ -36,7 +36,7 @@
         <!-- All customizations that are NOT specific to a particular API-level can go here. -->
     </style>
 
-    <style name="ActionBar" parent="ThemeOverlay.AppCompat.ActionBar">
+    <style name="ActionBar" parent="@style/ThemeOverlay.AppCompat.Dark.ActionBar">
         <item name="android:displayOptions">homeAsUp</item>
     </style>
 

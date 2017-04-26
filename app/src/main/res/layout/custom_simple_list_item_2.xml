@@ -9,13 +9,11 @@
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:layout_weight="0.5"
-        android:gravity="center"
-        android:text="hi" />
+        android:gravity="center"/>
     <TextView
         android:id="@+id/text2"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:layout_weight="0.5"
-        android:gravity="center"
-        android:text="2hi2" />
+        android:gravity="center"/>
 </TwoLineListItem>

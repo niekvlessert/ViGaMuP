@@ -74,7 +74,7 @@ xmlns:android="http://schemas.android.com/apk/res/android"
                     android:textColor="@color/white"
                     android:textSize="18sp"
                     android:textStyle="bold"
-                    android:layout_marginStart="10sp"
+                    android:layout_marginLeft="10sp"
                     android:layout_marginTop="5sp"/>
 
                 <TextView
@@ -84,7 +84,7 @@ xmlns:android="http://schemas.android.com/apk/res/android"
                     android:layout_weight="1"
                     android:textColor="@color/white"
                     android:textSize="12sp"
-                    android:layout_marginStart="10sp"/>
+                    android:layout_marginLeft="10sp"/>
             </LinearLayout>
 
         </LinearLayout>
