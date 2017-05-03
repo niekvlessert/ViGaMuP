@@ -321,6 +321,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 bufferBarProgress = 2; // 2 seconds buffered always in advance...
                 seekBarThumbProgress = 0;
                 seekBar.setProgress(0);
+                seekBar.setSecondaryProgress(mPlayerService.getBufferBarProgress()+2);
                 Log.d(LOG_TAG, "Game in onresume: " + game.title + " " + game.position);
                 if (!game.getTitle().equals(currentShowedGameTitle)) showGame(false);
                 //LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
@@ -628,9 +629,11 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     @Override
     public void gameClicked(int position) {
         if (gameCollection.getGameAtPosition(position).getTitle().equals(gameCollection.getCurrentGame().getTitle())){
+            currentShowedGameTitle="";
             showGame(false);
         } else {
             gameCollection.setCurrentGame(position);
+            currentShowedGameTitle="";
             showGame(true);
         }
     }
@@ -638,7 +641,11 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
     public void showGame(boolean setNewKss) {
         Game game = gameCollection.getCurrentGame();
         Log.d("KSS", "game " + game.getTitle());
+        if (!currentShowedGameTitle.equals(game.getTitle())) {
+            Log.d(LOG_TAG, "wow, new game!!");
         currentShowedGameTitle = game.getTitle();
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) { window.setStatusBarColor(Color.BLACK ); }
 
         View header, header2;
         boolean gameLogoImageFound = true;
@@ -705,7 +712,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 try { t.join(); } catch (InterruptedException ie){}
 
                 setPlayButtonInPlayerBar();
-
             }
         });
 
@@ -745,7 +751,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         lv.setAdapter(arrayAdapter);
 
         mLayout.setPanelState(SlidingUpPanelLayout.PanelState.EXPANDED);
-
+        }
     }
 
     private boolean directoryExists(String directory) {

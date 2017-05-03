@@ -54,6 +54,9 @@ int loopTrack = 0;
 int loopTrackWasEnabled = 0;
 int skipToNextTrack = 0;
 
+int globalTrackNumber = 0;
+int globalSecondsToPlay = 0;
+
 int slesThingsCreated = 0;
 
 long previousSum = 0;
@@ -193,7 +196,7 @@ void* generateAudioThread(void* context){
     {
         if (!loopTrack) {
 
-            if (loopTrackWasEnabled) { //fade to next track..
+            if (loopTrackWasEnabled) { //fade to next track...
                 initialDataCopied = 1;
                 secondsToGenerate = 2;
                 generatingAllowed = 1;
@@ -355,17 +358,19 @@ jboolean Java_nl_vlessert_vigamup_PlayerService_toggleLoopTrack(JNIEnv* env, jcl
     }
 }
 
-void Java_nl_vlessert_vigamup_PlayerService_setKssTrack(JNIEnv* env, jclass clazz, int trackNr, int secondsToPlay){
+void Java_nl_vlessert_vigamup_PlayerService_setKssTrack(JNIEnv* env, jclass clazz, int trackNr, int secondsToPlay) {
     secondsToGenerate = 0;
     trackLength = 0;
     initialDataCopied = 0;
     generatingAllowed = 0;
     queueSecond = 0;
     secondsPlayed = 0;
+    globalSecondsToPlay = secondsToPlay;
+    globalTrackNumber = trackNr;
 
     if (isPlaying) {
-        isPlaying=0;
-        while (isBuffering){
+        isPlaying = 0;
+        while (isBuffering) {
             usleep(100);
         }
         pthread_mutex_lock(&lock);
@@ -373,20 +378,25 @@ void Java_nl_vlessert_vigamup_PlayerService_setKssTrack(JNIEnv* env, jclass claz
         //free(fullTrackWavebuf);
         SLresult result = (*bqPlayerBufferQueue)->Clear(bqPlayerBufferQueue);
         if (SL_RESULT_SUCCESS != result) {
-            __android_log_print(ANDROID_LOG_INFO, "KSS", "Clear failed at begin of OpenSL_startRecording()() result=%d\n", result);
+            __android_log_print(ANDROID_LOG_INFO, "KSS",
+                                "Clear failed at begin of OpenSL_startRecording()() result=%d\n",
+                                result);
             return;
         }
         //(*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
         pthread_mutex_unlock(&lock);
     }
-    KSSPLAY_reset(kssplay, trackNr, 0);
-    secondsToGenerate = secondsToPlay;
-    if (secondsToPlay==1) secondsToPlay=3;
-    trackLength = secondsToPlay;
+}
+
+void Java_nl_vlessert_vigamup_PlayerService_startKssPlayback(JNIEnv* env, jclass clazz) {
+    KSSPLAY_reset(kssplay, globalTrackNumber, 0);
+    secondsToGenerate = globalSecondsToPlay;
+    if (globalSecondsToPlay==1) globalSecondsToPlay=3;
+    trackLength = globalSecondsToPlay;
     //__android_log_print(ANDROID_LOG_INFO, "KSS", "Komt ie hier?!?!? %d", (int)sizeof(fullTrackWavebuf));
     if (fullTrackWavebuf!=NULL) free(fullTrackWavebuf);
     //__android_log_print(ANDROID_LOG_INFO, "KSS", "Hier dan?!?!? %d ", secondsToPlay);
-    fullTrackWavebuf = malloc(96000 * secondsToPlay);
+    fullTrackWavebuf = malloc(96000 * globalSecondsToPlay);
     KSSPLAY_calc(kssplay, wavebuf, 48000);
     KSSPLAY_calc(kssplay, wavebuf2, 48000);
     //__android_log_print(ANDROID_LOG_INFO, "KSS", "Of hier....");

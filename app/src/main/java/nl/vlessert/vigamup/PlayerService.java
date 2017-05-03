@@ -26,6 +26,8 @@ import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 import android.widget.RemoteViews;
 
+import java.io.File;
+
 public class PlayerService extends Service{
     private static final String NOTIFICATION_DELETED_ACTION = "NOTIFICATION_DELETED";
 
@@ -65,6 +67,7 @@ public class PlayerService extends Service{
     private Game currentGame;
 
     private boolean justStarted = true;
+    private boolean alreadyPlaying = false;
 
     private String currentFile = "";
 
@@ -309,8 +312,8 @@ public class PlayerService extends Service{
 
         //views.setViewVisibility(R.id.status_bar_icon, View.VISIBLE);
         //views.setViewVisibility(R.id.status_bar_album_art, View.GONE);
-        views.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeResource(getResources(), R.drawable.default_album_art));
-        bigViews.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeResource(getResources(), R.drawable.default_album_art));
+        views.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant_tiny));
+        bigViews.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant));
 
         notificationIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                 | Intent.FLAG_ACTIVITY_CLEAR_TASK);
@@ -366,9 +369,9 @@ public class PlayerService extends Service{
                 .setTicker("")
                 .setContentText("")
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setSmallIcon(R.drawable.default_album_art)
+                .setSmallIcon(R.drawable.music_note_transparant_tiny)
                 .setLargeIcon(
-                        Bitmap.createScaledBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.default_album_art), 128, 128, false))
+                        Bitmap.createScaledBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant), 128, 128, false))
                 .setContentIntent(pendingIntent)
                 //.setOngoing(true)
                 .setAutoCancel(true)
@@ -433,8 +436,16 @@ public class PlayerService extends Service{
 
         bigViews.setTextViewText(R.id.status_bar_album_name, game.getVendor());
 
-        views.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
-        bigViews.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
+        File file = new File(game.imageFile.getAbsolutePath());
+                //trackListGameLogoView.setImageBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant));
+
+        if (file.exists()){
+            views.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
+            bigViews.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
+        } else {
+            views.setImageViewBitmap(R.id.status_bar_album_art, Bitmap.createScaledBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant), 128, 128, false));
+            bigViews.setImageViewBitmap(R.id.status_bar_album_art, Bitmap.createScaledBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant), 128, 128, false));
+        }
 
         mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
     }
@@ -474,6 +485,7 @@ public class PlayerService extends Service{
                 currentGame.setTrack(gt.getPosition());
                 break;
             case Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM:
+                justStarted = false;
                 String gameAndTrackInfo = gameCollection.getNextRandomGameAndTrack();
                 String[] gameAndTrackInfoArray = gameAndTrackInfo.split(",");
                 gameCollection.setCurrentGame(Integer.parseInt(gameAndTrackInfoArray[0]));
@@ -485,6 +497,10 @@ public class PlayerService extends Service{
         }
         Log.d(LOG_TAG, "Randomizer: " + randomizer);
         setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
+        if (!paused) {
+            alreadyPlaying = true;
+            startKssPlayback();
+        }
         Intent intent = new Intent("setSlidingUpPanelWithGame");
         sendBroadcast(intent);
         updateNotificationTitles();
@@ -513,6 +529,7 @@ public class PlayerService extends Service{
                 currentGame.setTrack(gt.getPosition());
                 break;
             case Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM:
+                justStarted = false;
                 String gameAndTrackInfo = gameCollection.getPreviousRandomGameAndTrack();
                 String[] gameAndTrackInfoArray = gameAndTrackInfo.split(",");
                 gameCollection.setCurrentGame(Integer.parseInt(gameAndTrackInfoArray[0]));
@@ -524,6 +541,10 @@ public class PlayerService extends Service{
         }
         Intent intent = new Intent("setSlidingUpPanelWithGame");
         setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
+        if (!paused) {
+            alreadyPlaying = true;
+            startKssPlayback();
+        }
         sendBroadcast(intent);
         updateNotificationTitles();
         updateA2DPInfo();
@@ -532,6 +553,7 @@ public class PlayerService extends Service{
     public void playCurrentTrack() {
         Game game = gameCollection.getCurrentGame();
         setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+        startKssPlayback();
         updateNotificationTitles();
         updateA2DPInfo();
         setPlayingStatePlaying();
@@ -556,8 +578,8 @@ public class PlayerService extends Service{
         kssTrackSet = true;
         secondsPlayedFromCurrentTrack = 0;
         secondsBufferedFromCurrentTrack = 0;
+        alreadyPlaying = false;
         setKssTrack(track, length);
-        Log.d(LOG_TAG, "segfault hier al?!?!");
     }
 
     public void startPlayback(){
@@ -595,6 +617,11 @@ public class PlayerService extends Service{
         if (repeatMode == Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM && justStarted){
             nextTrack();
             justStarted = false;
+        }
+
+        if (!alreadyPlaying) {
+            startKssPlayback();
+            alreadyPlaying = true;
         }
 
         paused = togglePlayback();
@@ -769,6 +796,10 @@ public class PlayerService extends Service{
         sendBroadcast(intent);
     }
 
+    public int getBufferBarProgress() {
+        return secondsBufferedFromCurrentTrack;
+    }
+
     private void setSeekBarThumbProgress(){
         secondsPlayedFromCurrentTrack++;
         Intent intent = new Intent("setSeekBarThumbProgress");
@@ -790,6 +821,7 @@ public class PlayerService extends Service{
     public static native void createBufferQueueAudioPlayer(int sampleRate, int samplesPerBuf);
     public static native void setKss(String file);
     public static native void setKssTrack(int track, int length);
+    public static native void startKssPlayback();
     public static native boolean togglePlayback();
     public static native boolean toggleLoopTrack();
     public native void setKssProgress(int progress);
