@@ -22,4 +22,10 @@ public class Constants {
         public static int SHUFFLE_IN_GAME = 3;
         public static int SHUFFLE_IN_PLATFORM = 4;
     }
+
+    public interface BIG_VIEW_TYPES {
+        int SQUARE = 0;
+        int RECTANGULAR = 1;
+        int STRETCHED = 2;
+    }
 }

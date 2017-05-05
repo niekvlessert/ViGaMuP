@@ -12,6 +12,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
 import android.media.session.MediaSession;
@@ -70,6 +72,8 @@ public class PlayerService extends Service{
     private boolean alreadyPlaying = false;
 
     private String currentFile = "";
+    private String currentLogoFile = "";
+    private int currentBigViewType = Constants.BIG_VIEW_TYPES.SQUARE;
 
     static {
         System.loadLibrary("kss_player");
@@ -142,7 +146,7 @@ public class PlayerService extends Service{
                 createGameCollection();
                 hasGameCollection = true;
             }
-            createNotification();
+            createNotification(Constants.BIG_VIEW_TYPES.SQUARE);
 
         } else if (intent.getAction().equals(Constants.ACTION.PREV_ACTION)) {
             Log.i(LOG_TAG, "Clicked Previous");
@@ -297,7 +301,10 @@ public class PlayerService extends Service{
 
     public boolean isPaused(){ return paused; }
 
-    private void createNotification(){
+    private void createNotification(int bigViewType){
+        currentBigViewType = bigViewType;
+        Log.d(LOG_TAG, "hmmm: " +currentBigViewType);
+
         Log.i(LOG_TAG, "Received Start Foreground Intent ");
         Intent notificationIntent = new Intent(this, MainActivity.class);
 
@@ -308,8 +315,15 @@ public class PlayerService extends Service{
         notificationIntent.setAction(Constants.ACTION.MAIN_ACTION);
 
         views = new RemoteViews(getPackageName(), R.layout.custom_notification);
-        bigViews = new RemoteViews(getPackageName(), R.layout.custom_notification_expanded);
-
+        if (bigViewType == Constants.BIG_VIEW_TYPES.STRETCHED) {
+            bigViews = new RemoteViews(getPackageName(), R.layout.custom_notification_expanded_stretched_image);
+        } else {
+            if (bigViewType == Constants.BIG_VIEW_TYPES.RECTANGULAR) {
+                bigViews = new RemoteViews(getPackageName(), R.layout.custom_notification_expanded_rectangular_image);
+            } else {
+                bigViews = new RemoteViews(getPackageName(), R.layout.custom_notification_expanded_square_image);
+            }
+        }
         //views.setViewVisibility(R.id.status_bar_icon, View.VISIBLE);
         //views.setViewVisibility(R.id.status_bar_album_art, View.GONE);
         views.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant_tiny));
@@ -428,6 +442,53 @@ public class PlayerService extends Service{
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         Game game = gameCollection.getCurrentGame();
 
+        File file = new File(game.imageFile.getAbsolutePath());
+                //trackListGameLogoView.setImageBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant));
+
+        if (!currentLogoFile.equals(game.imageFile.getAbsolutePath())) {
+            currentLogoFile = game.imageFile.getAbsolutePath();
+            if (file.exists()) {
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(game.imageFile.getAbsolutePath(), options);
+                int width = options.outWidth;
+                int height = options.outHeight;
+                Log.d(LOG_TAG, "width: " + width + " height: " + height + " currentBigViewType: " + currentBigViewType);
+                if (width/height > 4) {
+                    if (currentBigViewType != Constants.BIG_VIEW_TYPES.STRETCHED)
+                        createNotification(Constants.BIG_VIEW_TYPES.STRETCHED);
+                } else {
+                    if ((width / height <= 4) && (width / height > 1.2)) {
+                        Log.d(LOG_TAG, "setting rectangular!");
+                        if (currentBigViewType != Constants.BIG_VIEW_TYPES.RECTANGULAR) {
+                            createNotification(Constants.BIG_VIEW_TYPES.RECTANGULAR);
+                        }
+                    } else {
+                        if (currentBigViewType != Constants.BIG_VIEW_TYPES.SQUARE) {
+                            createNotification(Constants.BIG_VIEW_TYPES.SQUARE);
+                        }
+                    }
+                }
+
+                Bitmap image = BitmapFactory.decodeFile(game.imageFile.getAbsolutePath());
+                if (game.getLogoBackGroundColor()!="black") {
+                    Bitmap newBitmap = Bitmap.createBitmap(image.getWidth(), image.getHeight(), image.getConfig());
+                    Canvas canvas = new Canvas(newBitmap);
+                    canvas.drawColor(Color.WHITE);
+                    canvas.drawBitmap(image, 0, 0, null);
+                    views.setImageViewBitmap(R.id.status_bar_album_art, newBitmap);
+                    bigViews.setImageViewBitmap(R.id.status_bar_album_art, newBitmap);
+                } else {
+                    views.setImageViewBitmap(R.id.status_bar_album_art, image);
+                    bigViews.setImageViewBitmap(R.id.status_bar_album_art, image);
+                }
+            } else {
+                views.setImageViewBitmap(R.id.status_bar_album_art, Bitmap.createScaledBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant), 128, 128, false));
+                bigViews.setImageViewBitmap(R.id.status_bar_album_art, Bitmap.createScaledBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant), 128, 128, false));
+            }
+            if (!paused) setPlayingStatePlaying();
+        }
+
         views.setTextViewText(R.id.status_bar_track_name, game.getCurrentTrackTitle());
         bigViews.setTextViewText(R.id.status_bar_track_name, game.getCurrentTrackTitle());
 
@@ -436,17 +497,6 @@ public class PlayerService extends Service{
 
         bigViews.setTextViewText(R.id.status_bar_album_name, game.getVendor());
 
-        File file = new File(game.imageFile.getAbsolutePath());
-                //trackListGameLogoView.setImageBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant));
-
-        if (file.exists()){
-            views.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
-            bigViews.setImageViewBitmap(R.id.status_bar_album_art, BitmapFactory.decodeFile(game.imageFile.getAbsolutePath()));
-        } else {
-            views.setImageViewBitmap(R.id.status_bar_album_art, Bitmap.createScaledBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant), 128, 128, false));
-            bigViews.setImageViewBitmap(R.id.status_bar_album_art, Bitmap.createScaledBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant), 128, 128, false));
-        }
-
         mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
     }
 
@@ -454,17 +504,22 @@ public class PlayerService extends Service{
         gameCollection = new GameCollection(this);
         gameCollection.createGameCollection();
         hasGameCollection = true;
+
         Intent startIntent = new Intent();
         startIntent.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
         Log.d(LOG_TAG,"starting service...");
+
         onStartCommand(startIntent,0,0);
     }
 
     private void nextTrack() {
         fixUninitialized();
+
         Log.d(LOG_TAG,"Next track called..." + Debug.getNativeHeapAllocatedSize() + " and " + Debug.getNativeHeapSize());
         Log.d(LOG_TAG,"game: " + currentGame.getTitle());
+
         sendBroadcast(new Intent("resetSeekBar"));
+
         switch (repeatMode) {
             case Constants.REPEAT_MODES.NORMAL_PLAYBACK:
             case Constants.REPEAT_MODES.LOOP_TRACK:
@@ -495,15 +550,21 @@ public class PlayerService extends Service{
                 Log.d(LOG_TAG,"gameAndTrackInfo: " + gameAndTrackInfo);
                 break;
         }
+
         Log.d(LOG_TAG, "Randomizer: " + randomizer);
+
         setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
+
         if (!paused) {
             alreadyPlaying = true;
             startKssPlayback();
         }
+
         Intent intent = new Intent("setSlidingUpPanelWithGame");
         sendBroadcast(intent);
+
         updateNotificationTitles();
+
         updateA2DPInfo();
     }
 

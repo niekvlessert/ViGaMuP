@@ -642,115 +642,114 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         Game game = gameCollection.getCurrentGame();
         Log.d("KSS", "game " + game.getTitle());
         if (!currentShowedGameTitle.equals(game.getTitle())) {
-            Log.d(LOG_TAG, "wow, new game!!");
-        currentShowedGameTitle = game.getTitle();
+            currentShowedGameTitle = game.getTitle();
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) { window.setStatusBarColor(Color.BLACK ); }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) { window.setStatusBarColor(Color.BLACK ); }
 
-        View header, header2;
-        boolean gameLogoImageFound = true;
-        BufferedInputStream buffer;
+            View header, header2;
+            boolean gameLogoImageFound = true;
+            BufferedInputStream buffer;
 
-        header = getLayoutInflater().inflate(R.layout.tracklist_header, lv, false);
-        trackListGameLogoView = (ImageView) header.findViewById(R.id.tracklistHeader);
+            header = getLayoutInflater().inflate(R.layout.tracklist_header, lv, false);
+            trackListGameLogoView = (ImageView) header.findViewById(R.id.tracklistHeader);
 
-        try {
-            buffer = new BufferedInputStream(new FileInputStream(game.imageFile.getAbsolutePath()));
-            Bitmap bitmap = BitmapFactory.decodeStream(buffer);
-            trackListGameLogoView.setImageBitmap(bitmap);
-            trackListGameLogoView.setBackgroundColor(Color.parseColor(game.getLogoBackGroundColor()));
-            //gameLogoView.setImageBitmap(bitmap);
-            //gameLogoView.setBackgroundColor(Color.parseColor(game.getLogoBackGroundColor()));
-            Log.d(LOG_TAG, "load image file...");
-            Log.d(LOG_TAG, "url: " + game.imageFile.getAbsolutePath());
-        } catch (java.io.FileNotFoundException e) {
-            gameLogoImageFound = false;
-            Log.d(LOG_TAG, "load failed!!");
-        }
+            try {
+                buffer = new BufferedInputStream(new FileInputStream(game.imageFile.getAbsolutePath()));
+                Bitmap bitmap = BitmapFactory.decodeStream(buffer);
+                trackListGameLogoView.setImageBitmap(bitmap);
+                trackListGameLogoView.setBackgroundColor(Color.parseColor(game.getLogoBackGroundColor()));
+                //gameLogoView.setImageBitmap(bitmap);
+                //gameLogoView.setBackgroundColor(Color.parseColor(game.getLogoBackGroundColor()));
+                Log.d(LOG_TAG, "load image file...");
+                Log.d(LOG_TAG, "url: " + game.imageFile.getAbsolutePath());
+            } catch (java.io.FileNotFoundException e) {
+                gameLogoImageFound = false;
+                Log.d(LOG_TAG, "load failed!!");
+            }
 
-        header2 = getLayoutInflater().inflate(R.layout.tracklist_textview_header, lv, false);
-        TextView tv2 = (TextView) header2.findViewById(R.id.textView1);
-        tv2.setText(game.getTitle());
+            header2 = getLayoutInflater().inflate(R.layout.tracklist_textview_header, lv, false);
+            TextView tv2 = (TextView) header2.findViewById(R.id.textView1);
+            tv2.setText(game.getTitle());
 
-        lv = (ListView) findViewById(R.id.list);
+            lv = (ListView) findViewById(R.id.list);
 
-        if ((setNewKss && mServiceBound) || (!initialized && mServiceBound)) {
-            globalSetNewKss = true;
-            initialized = true;
-        }
-        if (setNewKss && !mServiceBound) {
-            Toast.makeText(this, "Service initiating... try again", Toast.LENGTH_LONG).show();
-            return;
-        }
+            if ((setNewKss && mServiceBound) || (!initialized && mServiceBound)) {
+                globalSetNewKss = true;
+                initialized = true;
+            }
+            if (setNewKss && !mServiceBound) {
+                Toast.makeText(this, "Service initiating... try again", Toast.LENGTH_LONG).show();
+                return;
+            }
 
-        lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                //Log.d(LOG_TAG,"setting color on: " + lv.getChildAt(position));
-                //lv.getChildAt(position).setBackgroundColor(Color.GREEN);
-                //lv.setBackgroundColor(Color.WHITE);
-                Game game = gameCollection.getCurrentGame();
-                if (globalSetNewKss) {
-                    mPlayerService.setKssJava(game.musicFileC);
-                    globalSetNewKss = false;
-                }
-                game.setTrack(position-1);
-                setTrackInfoInPlayerBar();
-
-                Thread t = new Thread(new Runnable() {
-                    public void run() {
-                        Game game = gameCollection.getCurrentGame();
-                        seekBar.setMax(game.getCurrentTrackLength());
-                        bufferBarProgress = 2; // 2 seconds buffered always in advance...
-                        seekBarThumbProgress = 0;
-                        seekBar.setProgress(0);
-                        mPlayerService.playCurrentTrack();
+            lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                @Override
+                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                    //Log.d(LOG_TAG,"setting color on: " + lv.getChildAt(position));
+                    //lv.getChildAt(position).setBackgroundColor(Color.GREEN);
+                    //lv.setBackgroundColor(Color.WHITE);
+                    Game game = gameCollection.getCurrentGame();
+                    if (globalSetNewKss) {
+                        mPlayerService.setKssJava(game.musicFileC);
+                        globalSetNewKss = false;
                     }
-                });
+                    game.setTrack(position-1);
+                    setTrackInfoInPlayerBar();
 
-                t.start();
-                try { t.join(); } catch (InterruptedException ie){}
+                    Thread t = new Thread(new Runnable() {
+                        public void run() {
+                            Game game = gameCollection.getCurrentGame();
+                            seekBar.setMax(game.getCurrentTrackLength());
+                            bufferBarProgress = 2; // 2 seconds buffered always in advance...
+                            seekBarThumbProgress = 0;
+                            seekBar.setProgress(0);
+                            mPlayerService.playCurrentTrack();
+                        }
+                    });
 
-                setPlayButtonInPlayerBar();
+                    t.start();
+                    try { t.join(); } catch (InterruptedException ie){}
+
+                    setPlayButtonInPlayerBar();
+                }
+            });
+
+            List<String> trackArrayList = game.getTrackInformationList();
+
+            if (trackArrayList.size()==0) {
+                Log.d(LOG_TAG,"No track information... let's generate it!!");
+                mPlayerService.generateTrackInformation();
+                trackArrayList = game.getTrackInformationList();
             }
-        });
 
-        List<String> trackArrayList = game.getTrackInformationList();
+            ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(
+                    this,
+                    android.R.layout.simple_list_item_1,
+                    trackArrayList );
 
-        if (trackArrayList.size()==0) {
-            Log.d(LOG_TAG,"No track information... let's generate it!!");
-            mPlayerService.generateTrackInformation();
-            trackArrayList = game.getTrackInformationList();
-        }
-
-        ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(
-                this,
-                android.R.layout.simple_list_item_1,
-                trackArrayList );
-
-        if (headerAddedBefore) {
-            View view = lv.getAdapter().getView(0, null, lv);
-            if (view instanceof LinearLayout || view instanceof ImageView){
-                if (gameLogoImageFound ) {
+            if (headerAddedBefore) {
+                View view = lv.getAdapter().getView(0, null, lv);
+                if (view instanceof LinearLayout || view instanceof ImageView){
+                    if (gameLogoImageFound ) {
+                        lv.removeHeaderView(view);
+                        lv.addHeaderView(header, null, false);
+                    }
+                }
+                if (view instanceof ImageView && !gameLogoImageFound){
                     lv.removeHeaderView(view);
-                    lv.addHeaderView(header, null, false);
+                    lv.addHeaderView(header2, null, false);
                 }
             }
-            if (view instanceof ImageView && !gameLogoImageFound){
-                lv.removeHeaderView(view);
-                lv.addHeaderView(header2, null, false);
+
+            if (!headerAddedBefore) {
+                if (!gameLogoImageFound) lv.addHeaderView(header2, null, false);
+                    else lv.addHeaderView(header, null, false);
+                headerAddedBefore = true;
             }
-        }
 
-        if (!headerAddedBefore) {
-            if (!gameLogoImageFound) lv.addHeaderView(header2, null, false);
-                else lv.addHeaderView(header, null, false);
-            headerAddedBefore = true;
-        }
+            lv.setAdapter(arrayAdapter);
 
-        lv.setAdapter(arrayAdapter);
-
-        mLayout.setPanelState(SlidingUpPanelLayout.PanelState.EXPANDED);
+            mLayout.setPanelState(SlidingUpPanelLayout.PanelState.EXPANDED);
         }
     }
 
