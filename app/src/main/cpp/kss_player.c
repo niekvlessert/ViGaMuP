@@ -13,6 +13,7 @@
 #include <SLES/OpenSLES_Android.h>
 
 #include "libkss/src/kssplay.h"
+#include "game-music-emu-0.6.0/gme/gme.h"
 
 // engine interfaces
 static SLObjectItf engineObject = NULL;
@@ -47,6 +48,7 @@ int isBuffering = 0;
 int16_t *fullTrackWavebuf;
 int16_t *wavebuf;
 int16_t *wavebuf2;
+int16_t *spcwavebuf;
 int nextMessageSend = 0;
 int terminateThread = 0;
 int threadTerminated = 0;
@@ -60,6 +62,14 @@ int globalSecondsToPlay = 0;
 int slesThingsCreated = 0;
 
 long previousSum = 0;
+
+// 0 = MSX
+// 5 = SPC
+// 10 = PC
+
+int activeGameType = 0;
+
+Music_Emu* emu;
 
 pthread_mutex_t lock;
 pthread_t t1;
@@ -118,13 +128,9 @@ void nextTrack(void* context){
 
 int checkForSilence(int16_t* queueBuffer){
     long sum = 0;
-    //_android_log_print(ANDROID_LOG_INFO, "KSS", "lukt dit nog??");
     for (int i = 0; i < 10000; i++) {
         sum += queueBuffer[i];
     }
-    //__android_log_print(ANDROID_LOG_INFO, "KSS", "of dit??");
-
-    //sum = (sum >> 13);
     if (sum != 0 && previousSum != sum) {
         //__android_log_print(ANDROID_LOG_INFO, "KSS", "No silence... %ld, previous was %ld", sum, previousSum);
         previousSum = sum;
@@ -140,7 +146,7 @@ int queueSecondIfRequired(void *context){
     if (queueSecond && secondsPlayed<trackLength) {
         if (queueBufferToUse == 1) {
             //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
-            memcpy(queueBuffer1, (int8_t *) &fullTrackWavebuf[secondsPlayed * 48000], 96000);
+            memcpy(queueBuffer1, &fullTrackWavebuf[secondsPlayed * 48000], 96000);
             memcpy(queueBufferSilence, (int8_t *) &fullTrackWavebuf[secondsPlayed * 48000], 48000);
             queueSecond = 0;
             queueBufferToUse++;
@@ -150,7 +156,7 @@ int queueSecondIfRequired(void *context){
         } else {
             if (queueBufferToUse == 2 && queueSecond != 0) {
                 //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
-                memcpy(queueBuffer2, (int8_t *) &fullTrackWavebuf[secondsPlayed * 48000], 96000);
+                memcpy(queueBuffer2, &fullTrackWavebuf[secondsPlayed * 48000], 96000);
                 //if (checkForSilence(queueBuffer2)) nextTrack(context);
                 (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer2, 96000);
                 queueSecond = 0;
@@ -159,8 +165,7 @@ int queueSecondIfRequired(void *context){
             } else {
                 if (queueBufferToUse == 3 && queueSecond != 0) {
                     //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
-                    memcpy(queueBuffer3, (int8_t *) &fullTrackWavebuf[secondsPlayed * 48000],
-                           96000);
+                    memcpy(queueBuffer3, &fullTrackWavebuf[secondsPlayed * 48000], 96000);
                     //if (checkForSilence(queueBuffer3)) nextTrack(context);
                     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer3, 96000);
                     queueSecond = 0;
@@ -189,7 +194,7 @@ void* generateAudioThread(void* context){
     jmethodID nextTrackId = (*env)->GetMethodID(env, pctx->PlayerServiceClz, "nextTrack", "()V");
     jmethodID setBufferBarProgressId = (*env)->GetMethodID(env, pctx->PlayerServiceClz, "setBufferBarProgress", "()V");
     jmethodID setSeekBarThumbProgressId = (*env)->GetMethodID(env, pctx->PlayerServiceClz, "setSeekBarThumbProgress", "()V");
-    pthread_t id = pthread_self();
+    //pthread_t id = pthread_self();
     int a=0;
     int queueSecondResult=0;
     while(1)
@@ -217,11 +222,31 @@ void* generateAudioThread(void* context){
                     secondsPlayed = 2;
                     secondsToGenerate = secondsToGenerate - 2;
                 }
-                KSSPLAY_calc(kssplay, &fullTrackWavebuf[(trackLength - secondsToGenerate) * 48000], 48000);
+
+                if (activeGameType == 0) KSSPLAY_calc(kssplay, &fullTrackWavebuf[(trackLength - secondsToGenerate) * 48000], 48000);
+                    else {
+                        gme_play(emu, 48000, wavebuf);
+                        //gme_play(emu, 48000, wavebuf2);
+                        int i, n, even_index;
+                        n = 48000;
+                        even_index = 0;
+                        for(i=0;i<n;i++) // filling even and odd arrays
+                        {
+                            if((wavebuf[i]%2) == 0) spcwavebuf[even_index++] = wavebuf[i];
+                        }
+                    /*
+                        for(i=0;i<n;i++) // filling even and odd arrays
+                        {
+                            if((wavebuf2[i]%2) == 0) spcwavebuf[even_index++] = wavebuf2[i];
+                        }
+                        */
+                        memcpy(&fullTrackWavebuf[(trackLength - secondsToGenerate) * 48000], wavebuf, 96000);
+                    }
+
                 (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setBufferBarProgressId);
                 secondsToGenerate--;
                 if (secondsToGenerate == 1)
-                    KSSPLAY_fade_start(kssplay, 1000); //todo: only fade when song loops...
+                    if (activeGameType == 0) KSSPLAY_fade_start(kssplay, 1000); //todo: only fade when song loops...
                 queueSecondResult = queueSecondIfRequired(context);
                 //__android_log_print(ANDROID_LOG_INFO, "KSS", "Aha, in play routine!!! stg: %d",secondsToGenerate);
                 if (queueSecondResult == 1)
@@ -273,8 +298,8 @@ void* generateAudioThread(void* context){
         }
         usleep (500);
         if (a==10000) {
-            __android_log_print(ANDROID_LOG_INFO, "KSS", "is playing! %d secondstogenerate %d generatingallowed %d secondsplayed %d tracklength %d terminatethread %d", isPlaying, secondsToGenerate, generatingAllowed,
-                                secondsPlayed, trackLength ,!terminateThread);
+            __android_log_print(ANDROID_LOG_INFO, "KSS", "In thread... isplaying: %d secondstogenerate: %d generatingallowed: %d secondsplayed: %d tracklength: %d terminatethread: %d", isPlaying, secondsToGenerate, generatingAllowed,
+                                secondsPlayed, trackLength, terminateThread);
 
             // __android_log_print(ANDROID_LOG_INFO, "KSS", "In thread!");
             a=0;
@@ -367,6 +392,7 @@ void Java_nl_vlessert_vigamup_PlayerService_setKssTrack(JNIEnv* env, jclass claz
     secondsPlayed = 0;
     globalSecondsToPlay = secondsToPlay;
     globalTrackNumber = trackNr;
+    skipToNextTrack = 0;
 
     if (isPlaying) {
         isPlaying = 0;
@@ -389,6 +415,8 @@ void Java_nl_vlessert_vigamup_PlayerService_setKssTrack(JNIEnv* env, jclass claz
 }
 
 void Java_nl_vlessert_vigamup_PlayerService_startKssPlayback(JNIEnv* env, jclass clazz) {
+    activeGameType = 0;
+
     KSSPLAY_reset(kssplay, globalTrackNumber, 0);
     secondsToGenerate = globalSecondsToPlay;
     if (globalSecondsToPlay==1) globalSecondsToPlay=3;
@@ -404,6 +432,54 @@ void Java_nl_vlessert_vigamup_PlayerService_startKssPlayback(JNIEnv* env, jclass
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf2, 96000);
     //__android_log_print(ANDROID_LOG_INFO, "KSS", "En hier?!?!?");
     isPlaying = 1;
+}
+
+void Java_nl_vlessert_vigamup_PlayerService_startSpcPlayback(JNIEnv* env, jclass clazz) {
+    activeGameType = 5;
+    spcwavebuf = malloc(96000);
+
+    gme_open_file( "/sdcard/Download/ViGaMuP/spc/ct-112.spc", &emu, 24000 );
+    gme_start_track( emu, 0);
+    //int16_t *wavebuffer, *wavebuffer2, *wavebuffer3, *wavebuffer4;
+    //wavebuffer = malloc(96000);
+    //wavebuffer2 = malloc(96000);
+
+    fullTrackWavebuf = malloc(96000 * 100);
+
+    gme_play(emu, 48000, wavebuf);
+    gme_play(emu, 48000, wavebuf2);
+
+    int16_t *wavebufeven;
+    wavebufeven = malloc(96000);
+
+    int i, n, even_index;
+    n = 48000;
+    even_index = 0;
+    for(i=0;i<n;i++) // filling even and odd arrays
+    {
+        if((wavebuf[i]%2) == 0) wavebufeven[even_index++] = wavebuf[i] + wavebuf[i+1];
+    }
+    for(i=0;i<n;i++) // filling even and odd arrays
+    {
+        if((wavebuf2[i]%2) == 0) wavebufeven[even_index++] = wavebuf2[i] + wavebuf[i+1];
+    }
+
+    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebufeven, 96000);
+    //(*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf2, 96000);
+
+    /*wavebuffer3 = malloc(96000);
+    wavebuffer4 = malloc(96000);
+    gme_play(emu, 48000, wavebuffer3);
+    gme_play(emu, 48000, wavebuffer4);
+
+    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuffer3, 96000);
+    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuffer4, 96000);*/
+
+    //gme_delete( emu );
+    secondsToGenerate = 100;
+    isPlaying = 1;
+    trackLength = 100;
+
 }
 
 // create the engine and output mix objects

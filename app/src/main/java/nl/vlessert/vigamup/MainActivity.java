@@ -25,8 +25,11 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.IBinder;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.view.ViewPager;
 import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.TouchDelegate;
@@ -595,6 +598,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         boolean hasPermission = (ContextCompat.checkSelfPermission(this,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED);
 
+        boolean musicFound = false;
+
         if (!hasPermission) {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
@@ -603,26 +608,36 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         } else {
             if (directoryExists("ViGaMuP")) {
                 if (directoryExists("ViGaMuP/KSS")) {
-                    if (dirSize(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/KSS"))> 40000) return true;
+                    if (dirSize(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/KSS"))> 40000) musicFound = true;
                 } else {
                     makeDirectory("ViGaMuP/KSS");
+                }
+                if (directoryExists("ViGaMuP/SPC")) {
+                    if (dirSize(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/SPC"))> 40000) musicFound = true;
+                } else {
+                    makeDirectory("ViGaMuP/SPC");
                 }
             } else {
                 makeDirectory("ViGaMuP");
                 makeDirectory("ViGaMuP/KSS");
+                makeDirectory("ViGaMuP/SPC");
             }
+        }
+        if (!musicFound) {
             firstRun = true;
             downloadMusic();
             return false;
-        }
+        } else return true;
     }
 
     private void showMusicList(){
         gameCollection = mPlayerService.gameCollection;
-        FragmentManager fragmentManager = this.getSupportFragmentManager();
+        /*FragmentManager fragmentManager = this.getSupportFragmentManager();
         gameList = (GameList) fragmentManager.findFragmentById(R.id.fragment1);
-        gameList.updateGameList(gameCollection.getGameObjectsWithTrackInformation());
+        gameList.updateGameList(gameCollection.getGameObjectsWithTrackInformation());*/
         Log.d(LOG_TAG,"Show music list...");
+        ViewPager pager = (ViewPager) findViewById(R.id.viewPager);
+        pager.setAdapter(new MyPagerAdapter(this, getSupportFragmentManager()));
         gamesShowing = true;
     }
 
@@ -636,6 +651,10 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             currentShowedGameTitle="";
             showGame(true);
         }
+    }
+
+    public void spcClicked() {
+        mPlayerService.playSpc();
     }
 
     public void showGame(boolean setNewKss) {
@@ -856,7 +875,10 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 }
             }
         });
+    }
 
+    public void test(){
+        Log.d(LOG_TAG,"test...");
     }
 
     private void setBufferBarProgress(int bufferBarProgress){
@@ -869,5 +891,34 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         this.seekBarThumbProgress = seekBarThumbProgress;
         //Log.d(LOG_TAG,"seek bar should be set to " + seekBarThumbProgress);
         seekBar.setProgress(seekBarThumbProgress);
+    }
+
+    private class MyPagerAdapter extends FragmentPagerAdapter {
+        public Context mContext;
+
+
+        public MyPagerAdapter(Context c, FragmentManager fm) {
+            super(fm);
+
+            mContext = c;
+        }
+
+        @Override
+        public Fragment getItem(int pos) {
+            MultipleItemsList list;
+            switch (pos) {
+                case 0:
+                    return MultipleItemsList.newInstance(Constants.PLATFORM.MSX);
+                default:
+                    return MultipleItemsList.newInstance(Constants.PLATFORM.SNES);
+                /*default:
+                    return MultipleItemsList.newInstance(Constants.PLATFORM.PC_DEMO_SCENE);*/
+            }
+        }
+
+        @Override
+        public int getCount() {
+            return 2;
+        }
     }
 }

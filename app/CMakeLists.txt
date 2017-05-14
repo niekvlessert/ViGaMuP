@@ -38,13 +38,15 @@ find_library( # Sets the name of the path variable.
 # build script, prebuilt third-party libraries, or system libraries.
 
 add_subdirectory(src/main/cpp/libkss)
+add_subdirectory(src/main/cpp/game-music-emu-0.6.0)
 
 # Include libraries needed for native-audio-jni lib
 target_link_libraries(kss_player
                       android
                       log
                       OpenSLES
-                      kss)
+                      kss
+                      gme)
 
 
 

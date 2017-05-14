@@ -32,12 +32,12 @@ public class Game {
 
     private Context ctx;
 
-    public String vendor = null;
-    public String year = null;
-    public String composers = null;
-    public String chips = null;
-    public String japaneseTitle = null;
-    public String fullTitle = null;
+    public String vendor = "";
+    public String year = "";
+    public String composers = "";
+    public String chips = "";
+    public String japaneseTitle = "";
+    public String fullTitle = "";
     private String logoBackGroundColor = null;
 
     private ArrayList<GameTrack> trackInformation = new ArrayList<>();
@@ -290,5 +290,12 @@ public class Game {
             randomizedTrackInformationPosition = randomizedTrackInformation.size() - 1;
         else randomizedTrackInformationPosition--;
         return randomizedTrackInformation.get(randomizedTrackInformationPosition);
+    }
+
+    public String getVendorAndYear(){
+        String result = "";
+        if (vendor.length() > 0) result = vendor;
+        if (year.length() > 0 ) result = result.concat(", " + year);
+        return result;
     }
 }

@@ -27,12 +27,18 @@ xmlns:android="http://schemas.android.com/apk/res/android"
             sothree:theme="@style/ActionBar"
             android:layout_width="match_parent"/>
 
-        <fragment
+        <!--<fragment
             android:id="@+id/fragment1"
             android:name="nl.vlessert.vigamup.GameList"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            tools:layout="@layout/list_fragment" />
+            tools:layout="@layout/list_fragment" />-->
+
+        <android.support.v4.view.ViewPager
+            xmlns:android="http://schemas.android.com/apk/res/android"
+            android:id="@+id/viewPager"
+            android:layout_width="fill_parent"
+            android:layout_height="match_parent"/>
 
     </LinearLayout>
 
@@ -125,6 +131,7 @@ xmlns:android="http://schemas.android.com/apk/res/android"
         <!--</ScrollView>-->
     </LinearLayout>
 </com.sothree.slidinguppanel.SlidingUpPanelLayout>
+
 
     <!--<ImageView
         android:id="@+id/logo"

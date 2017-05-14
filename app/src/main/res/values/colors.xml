@@ -23,6 +23,9 @@
     <!-- Black -->
     <color name="black">#ff000000</color>
 
+    <color name="yellow">#ffff00</color>
+
+
     <!-- White -->
     <color name="white">#ffffffff</color>
 </resources>

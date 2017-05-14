@@ -16,16 +16,22 @@ public class Constants {
     }
 
     public interface REPEAT_MODES {
-        public static int NORMAL_PLAYBACK = 0;
-        public static int LOOP_TRACK = 1;
-        public static int LOOP_GAME = 2;
-        public static int SHUFFLE_IN_GAME = 3;
-        public static int SHUFFLE_IN_PLATFORM = 4;
+        int NORMAL_PLAYBACK = 0;
+        int LOOP_TRACK = 1;
+        int LOOP_GAME = 2;
+        int SHUFFLE_IN_GAME = 3;
+        int SHUFFLE_IN_PLATFORM = 4;
     }
 
     public interface BIG_VIEW_TYPES {
         int SQUARE = 0;
         int RECTANGULAR = 1;
         int STRETCHED = 2;
+    }
+
+    interface PLATFORM {
+        int MSX = 0;
+        int SNES = 1;
+        int PC_DEMO_SCENE = 2;
     }
 }

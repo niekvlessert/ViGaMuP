@@ -395,13 +395,31 @@ public class PlayerService extends Service{
                         pplayIntent)
                 .addAction(android.R.drawable.ic_media_next, "",
                         pnextIntent)
-                .addAction(R.drawable.img_btn_repeat, "",
-                        prepeatIntent)
+                .addAction(R.drawable.img_btn_repeat, "", prepeatIntent)
                 .setContent(views)
                 .setDeleteIntent(pendingIntent2)
                 .setCustomBigContentView(bigViews);
 
         notification = mNotificationCompatBuilder.build();
+
+        int repeatModeIcon = R.drawable.img_btn_repeat;
+        Log.d(LOG_TAG, "repeatmode: " + repeatMode);
+        switch(repeatMode) {
+            case Constants.REPEAT_MODES.NORMAL_PLAYBACK:
+                repeatModeIcon = R.drawable.img_btn_repeat;
+                break;
+            case Constants.REPEAT_MODES.LOOP_GAME:
+            case Constants.REPEAT_MODES.LOOP_TRACK:
+                repeatModeIcon = R.drawable.img_btn_repeat_pressed;
+                break;
+            case Constants.REPEAT_MODES.SHUFFLE_IN_GAME:
+            case Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM:
+                repeatModeIcon = R.drawable.img_btn_shuffle_pressed;
+                break;
+        }
+
+        bigViews.setImageViewResource(R.id.status_bar_repeat, repeatModeIcon);
+
         startForeground(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE,
                 notification);
     }
@@ -502,7 +520,7 @@ public class PlayerService extends Service{
 
     public void createGameCollection(){
         gameCollection = new GameCollection(this);
-        gameCollection.createGameCollection();
+        gameCollection.createGameCollection(Constants.PLATFORM.MSX);
         hasGameCollection = true;
 
         Intent startIntent = new Intent();
@@ -874,6 +892,11 @@ public class PlayerService extends Service{
         setKssProgress(progress);
     }
 
+    public void playSpc(){
+        Log.d(LOG_TAG, "Kom ik hier??!");
+        startSpcPlayback();
+    }
+
     public boolean getPaused(){
         return paused;
     }
@@ -883,6 +906,7 @@ public class PlayerService extends Service{
     public static native void setKss(String file);
     public static native void setKssTrack(int track, int length);
     public static native void startKssPlayback();
+    public static native void startSpcPlayback();
     public static native boolean togglePlayback();
     public static native boolean toggleLoopTrack();
     public native void setKssProgress(int progress);

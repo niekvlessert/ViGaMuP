@@ -26,6 +26,11 @@ android {
             path "CMakeLists.txt"
         }
     }
+    defaultConfig {
+        ndk {
+            abiFilters "armeabi", "armeabi-v7a"
+        }
+    }
 }
 
 dependencies {

@@ -9,7 +9,7 @@
         android:id="@+id/status_bar_album_art"
         android:layout_width="@dimen/status_bar_album_art"
         android:layout_height="@dimen/status_bar_album_art"
-        android:scaleType="center" />
+        android:scaleType="fitCenter" />
 
     <LinearLayout
         android:layout_width="0dp"

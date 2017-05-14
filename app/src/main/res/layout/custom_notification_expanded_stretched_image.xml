@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:id="@+id/notificationbg" android:layout_width="fill_parent" android:layout_height="128.0dip"
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:background="@android:color/background_dark">
+
+    <ImageView
+        android:id="@+id/status_bar_album_art"
+        android:layout_width="match_parent"
+        android:layout_height="45dp"
+        android:background="@color/black"/>
+
+    <LinearLayout
+        android:id="@+id/textarea"
+        android:layout_width="match_parent"
+        android:layout_height="35dp"
+        android:layout_below="@id/status_bar_album_art">
+        <TextView
+            android:ellipsize="marquee"
+            android:layout_gravity="start"
+            android:id="@+id/status_bar_track_name"
+            android:focusable="true"
+            android:fadingEdge="horizontal"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textSize="@dimen/text_size_medium"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/buttons"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/textarea">
+        <ImageButton
+            android:id="@+id/status_bar_prev"
+            android:background="?android:selectableItemBackground"
+            android:padding="10.0dip"
+            android:layout_width="0.0dip"
+            android:layout_height="@dimen/play_controls_notification"
+            android:src="@android:drawable/ic_media_previous"
+            android:scaleType="fitCenter"
+            android:layout_weight="1.0" />
+        <ImageButton
+            android:id="@+id/status_bar_play"
+            android:background="?android:selectableItemBackground"
+            android:padding="10.0dip"
+            android:layout_width="0.0dip"
+            android:layout_height="@dimen/play_controls_notification"
+            android:src="@android:drawable/ic_media_play"
+            android:scaleType="fitCenter"
+            android:layout_weight="1.0" />
+        <ImageButton android:id="@+id/status_bar_next"
+            android:background="?android:selectableItemBackground"
+            android:padding="10.0dip"
+            android:layout_width="0.0dip"
+            android:layout_height="@dimen/play_controls_notification"
+            android:src="@android:drawable/ic_media_next"
+            android:scaleType="fitCenter"
+            android:layout_weight="1.0" />
+        <ImageButton android:id="@+id/status_bar_repeat"
+            android:background="?android:selectableItemBackground"
+            android:padding="3.0dip"
+            android:layout_width="0.0dip"
+            android:layout_height="@dimen/play_controls_notification"
+            android:src="@drawable/img_btn_repeat"
+            android:scaleType="fitCenter"
+            android:layout_weight="1.0" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/textarea2"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/textarea"
+        android:layout_toRightOf="@id/buttons">
+        <TextView
+            android:ellipsize="marquee"
+            android:layout_gravity="left"
+            android:gravity="center"
+            android:id="@+id/status_bar_album_name"
+            android:fadingEdge="horizontal"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            />
+        <TextView
+            android:ellipsize="marquee"
+            android:layout_gravity="left"
+            android:gravity="center"
+            android:id="@+id/status_bar_artist_name"
+            android:fadingEdge="horizontal"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            />
+
+    </LinearLayout>
+
+
+
+</RelativeLayout>
