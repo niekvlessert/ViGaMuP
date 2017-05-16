@@ -122,7 +122,7 @@ public class PlayerService extends Service{
                 bufSize = Integer.parseInt(myAudioMgr.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER));
                 Log.d(LOG_TAG, "samplerate " + sampleRate + "bufzei " + bufSize);
             } else {
-                sampleRate = 48000;
+                sampleRate = 44100;
                 bufSize = 240;
             }
 
@@ -519,15 +519,18 @@ public class PlayerService extends Service{
     }
 
     public void createGameCollection(){
-        gameCollection = new GameCollection(this);
-        gameCollection.createGameCollection(Constants.PLATFORM.MSX);
-        hasGameCollection = true;
+        Log.d(LOG_TAG,"has game collection?: " +hasGameCollection);
+        if (!hasGameCollection || gameCollection.getCount()==0) {
+            gameCollection = new GameCollection(this);
+            gameCollection.createGameCollection(Constants.PLATFORM.MSX);
+            hasGameCollection = true;
 
-        Intent startIntent = new Intent();
-        startIntent.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
-        Log.d(LOG_TAG,"starting service...");
+            Intent startIntent = new Intent();
+            startIntent.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
+            Log.d(LOG_TAG, "starting service...");
 
-        onStartCommand(startIntent,0,0);
+            onStartCommand(startIntent, 0, 0);
+        }
     }
 
     private void nextTrack() {
@@ -657,7 +660,7 @@ public class PlayerService extends Service{
         kssTrackSet = true;
         secondsPlayedFromCurrentTrack = 0;
         secondsBufferedFromCurrentTrack = 0;
-        alreadyPlaying = false;
+        //alreadyPlaying = false;
         setKssTrack(track, length);
     }
 
@@ -697,6 +700,8 @@ public class PlayerService extends Service{
             nextTrack();
             justStarted = false;
         }
+
+        Log.d("KSS","alreadPlaying...: " + alreadyPlaying);
 
         if (!alreadyPlaying) {
             startKssPlayback();

@@ -197,6 +197,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             public void onClick(View v) {
                 // TODO Auto-generated method stub
                 Log.v("ImageButton", "Clicked!");
+                Log.v(LOG_TAG, "Hmmm.... " + mPlayerService.getPaused());
                 mPlayerService.togglePlaybackJava();
                 setPlayButtonInPlayerBar();
             }
@@ -308,35 +309,37 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         Log.d(LOG_TAG,"onResume!!");
         registerReceiver(receiver, filter);
         if (!firstRun) {
-            if (mServiceBound) {
-                if (rebuildMusicList) {
-                    rebuildMusicList = false;
-                    mPlayerService.createGameCollection();
+            if (checkForMusicAndInitialize()) {
+                if (mServiceBound) {
+                    if (rebuildMusicList) {
+                        rebuildMusicList = false;
+                        mPlayerService.createGameCollection();
+                    }
+                    gameCollection = mPlayerService.gameCollection;
+                    if (!gamesShowing) showMusicList();
+                    Game game = gameCollection.getCurrentGame();
+
+                    setTrackInfoInPlayerBar();
+                    setPlayButtonInPlayerBar();
+
+                    seekBar.setMax(game.getCurrentTrackLength());
+                    bufferBarProgress = 2; // 2 seconds buffered always in advance...
+                    seekBarThumbProgress = 0;
+                    seekBar.setProgress(0);
+                    seekBar.setSecondaryProgress(mPlayerService.getBufferBarProgress() + 2);
+                    Log.d(LOG_TAG, "Game in onresume: " + game.title + " " + game.position);
+                    if (!game.getTitle().equals(currentShowedGameTitle)) showGame(false);
+                    //LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
+                    //ViewGroup.LayoutParams params = ivLayout.getLayoutParams();
+                    //ivLayout.setVisibility(LinearLayout.GONE);
+                    //params.height = 0;
+                    //ivLayout.setLayoutParams(params);
+                } else {
+                    Intent startIntent = new Intent(MainActivity.this, PlayerService.class);
+                    startIntent.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
+                    startService(startIntent);
+                    bindService(startIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
                 }
-                gameCollection = mPlayerService.gameCollection;
-                if (!gamesShowing) showMusicList();
-                Game game = gameCollection.getCurrentGame();
-
-                setTrackInfoInPlayerBar();
-                setPlayButtonInPlayerBar();
-
-                seekBar.setMax(game.getCurrentTrackLength());
-                bufferBarProgress = 2; // 2 seconds buffered always in advance...
-                seekBarThumbProgress = 0;
-                seekBar.setProgress(0);
-                seekBar.setSecondaryProgress(mPlayerService.getBufferBarProgress()+2);
-                Log.d(LOG_TAG, "Game in onresume: " + game.title + " " + game.position);
-                if (!game.getTitle().equals(currentShowedGameTitle)) showGame(false);
-                //LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
-                //ViewGroup.LayoutParams params = ivLayout.getLayoutParams();
-                //ivLayout.setVisibility(LinearLayout.GONE);
-                //params.height = 0;
-                //ivLayout.setLayoutParams(params);
-            } else {
-                Intent startIntent = new Intent(MainActivity.this, PlayerService.class);
-                startIntent.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
-                startService(startIntent);
-                bindService(startIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
             }
         }
     }
@@ -384,6 +387,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
             gameCollection = mPlayerService.gameCollection;
             if (!gameListShowing){
+                mPlayerService.createGameCollection();
                 showMusicList();
                 Log.d(LOG_TAG, "show music list from onserviceconncet");
                 gameListShowing = true;
@@ -446,34 +450,46 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     //mResultTextView.setText(barcode.displayValue);
                     Toast.makeText(getApplicationContext(), "Downloading " + barcode.displayValue + "...", Toast.LENGTH_LONG).show();
                     if(barcode.displayValue.contains("vigamup_")) {
-                        Intent intent = getIntent();
+                        //Intent intent = getIntent();
                         Uri Download_Uri = Uri.parse(barcode.displayValue);
                         DownloadManager.Request request = new DownloadManager.Request(Download_Uri);
                         request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
                         request.setAllowedOverRoaming(false);
-                        request.setTitle(intent.getStringExtra(barcode.displayValue));
-                        String fileName = barcode.displayValue.substring(barcode.displayValue.lastIndexOf("/")+1);
+                        //request.setTitle(intent.getStringExtra(barcode.displayValue));
+                        String fileName = barcode.displayValue.substring(barcode.displayValue.lastIndexOf("/") + 1);
                         int position1 = fileName.indexOf("_") + 1;
-                        int position2 =  fileName.indexOf("_", position1);
+                        int position2 = fileName.indexOf("_", position1);
                         String fileType = fileName.substring(position1, position2);
-                        Log.d(LOG_TAG,fileType);
+                        Log.d(LOG_TAG, fileType);
                         if (fileType.equals("kss")) {
-                            fileName = barcode.displayValue.substring(barcode.displayValue.lastIndexOf("_")+1, barcode.displayValue.length());
-                            Log.d(LOG_TAG,"Filename: "+ fileName);
-                            if (directoryExists("ViGaMuP/KSS/" + fileName)) deleteDirectory("ViGaMuP/KSS/" + fileName);
-                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,"ViGaMuP/KSS/" + fileName);
+                            fileName = barcode.displayValue.substring(barcode.displayValue.lastIndexOf("_") + 1, barcode.displayValue.length());
+                            Log.d(LOG_TAG, "Filename: " + fileName);
+                            if (directoryExists("ViGaMuP/KSS/" + fileName))
+                                deleteDirectory("ViGaMuP/KSS/" + fileName);
+                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/KSS/" + fileName);
 
                             downloadReference = downloadManager.enqueue(request);
                         } else {
-                            Log.d(LOG_TAG,"Toast to report this is not a ViGaMuP file...");
+                            Log.d(LOG_TAG, "Toast to report this is not a ViGaMuP file...");
                         }
                         //Enqueue a new download and same the referenceId
                     } else {
-                        Log.d(LOG_TAG,"Toast to report this is not a ViGaMuP file...");
-                        /*Uri Download_Uri = Uri.parse(barcode.displayValue);
-                        DownloadManager.Request request = new DownloadManager.Request(Download_Uri);
-                        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,"ViGaMuP/KSS/test.zip");
-                        downloadReference = downloadManager.enqueue(request);*/
+                        if (barcode.displayValue.contains("snesmusic.org")) {
+                            //Intent intent = getIntent();
+                            Uri Download_Uri = Uri.parse(barcode.displayValue);
+                            DownloadManager.Request request = new DownloadManager.Request(Download_Uri);
+                            request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
+                            request.setAllowedOverRoaming(false);
+                            //request.setTitle(intent.getStringExtra(barcode.displayValue));
+                            String fileName = barcode.displayValue.substring(barcode.displayValue.lastIndexOf("=")+1)+".rsn";
+
+                            if (directoryExists("ViGaMuP/SPC/" + fileName)) deleteDirectory("ViGaMuP/SPC/" + fileName);
+
+                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/SPC/" + fileName);
+                            downloadReference = downloadManager.enqueue(request);
+                        } else {
+                            Log.d(LOG_TAG, "Toast to report this is not a ViGaMuP file...");
+                        }
                     }
                 }
             } else Log.e(LOG_TAG, String.format(getString(R.string.barcode_error_format),
@@ -526,15 +542,23 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                 int status = c.getInt(c.getColumnIndex(DownloadManager.COLUMN_STATUS));
                 Log.d(LOG_TAG,"status: "+status + ", "+DownloadManager.STATUS_FAILED);
                 if (status != DownloadManager.STATUS_FAILED) {
-                    String name = c.getString(c.getColumnIndex(DownloadManager.COLUMN_LOCAL_FILENAME));
+                    //String name = c.getString(c.getColumnIndex(DownloadManager.COLUMN_LOCAL_FILENAME));
+                    String downloadFileLocalUri = c.getString(c.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
+                    String name = "";
+                    if (downloadFileLocalUri != null) {
+                        File mFile = new File(Uri.parse(downloadFileLocalUri).getPath());
+                        name = mFile.getAbsolutePath();
+                    }
                     Log.i("DOWNLOAD LISTENER", "file name: " + name);
                     File file = new File(name);
                     File targetDirectory = new File(name.substring(0, name.lastIndexOf("/")));
-                    try {
-                        unzip(file, targetDirectory);
-                        boolean deleted = file.delete();
-                    } catch (IOException test) {
-                        Log.d(LOG_TAG, "Unzip error... very weird");
+                    if (name.contains("vigamup")) { //should be zip..
+                        try {
+                            unzip(file, targetDirectory);
+                            boolean deleted = file.delete();
+                        } catch (IOException test) {
+                            Log.d(LOG_TAG, "Unzip error... very weird");
+                        }
                     }
                     if (mPlayerService == null) {
                         Intent startIntent = new Intent(MainActivity.this, PlayerService.class);
@@ -550,6 +574,17 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                         showMusicList();
                     }
                     Toast.makeText(getApplicationContext(), "Download completed...", Toast.LENGTH_LONG).show();
+                    if (name.contains("rsn")) { // must be snesmusic.. enqueue image download here... ugly, but don't want to find out multiple downloading as of yet..
+                            String game = name.substring(name.lastIndexOf("/")+1, name.lastIndexOf("."));
+                            String fileNameImage = "http://snesmusic.org/v2/images/screenshots/"+game+".png";
+                            Uri Download_Uri2 = Uri.parse(fileNameImage);
+                            DownloadManager.Request request2 = new DownloadManager.Request(Download_Uri2);
+                            request2.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
+                            request2.setAllowedOverRoaming(false);
+                            request2.setTitle(intent.getStringExtra(fileNameImage));
+                            request2.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/SPC/" + game + ".png");
+                            downloadReference = downloadManager.enqueue(request2);
+                    }
                 } else {
                     Log.i(LOG_TAG, "Download failed!");
                     Toast.makeText(getApplicationContext(), "Download failed... try again", Toast.LENGTH_LONG).show();
@@ -559,6 +594,13 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             }
             c.close();
         }
+    }
+
+    private void unpackRsnTemporaryAndGenerateGameInfoFile(){
+        // unrar in /tmp
+        // get game & track info from spc files
+        // save trackfinfo and gameinfo files
+        // deletee extracted spc files
     }
 
     public static void unzip(File zipFile, File targetDirectory) throws IOException {

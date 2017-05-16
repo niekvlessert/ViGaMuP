@@ -74,6 +74,8 @@ Music_Emu* emu;
 pthread_mutex_t lock;
 pthread_t t1;
 
+int deviceSampleRate = 48000;
+
 int16_t *queueBuffer1, *queueBuffer2, *queueBuffer3;
 int16_t *queueBufferSilence;
 int queueBufferToUse = 1;
@@ -146,28 +148,28 @@ int queueSecondIfRequired(void *context){
     if (queueSecond && secondsPlayed<trackLength) {
         if (queueBufferToUse == 1) {
             //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
-            memcpy(queueBuffer1, &fullTrackWavebuf[secondsPlayed * 48000], 96000);
-            memcpy(queueBufferSilence, (int8_t *) &fullTrackWavebuf[secondsPlayed * 48000], 48000);
+            memcpy(queueBuffer1, &fullTrackWavebuf[secondsPlayed * deviceSampleRate], deviceSampleRate*2);
+            memcpy(queueBufferSilence, (int8_t *) &fullTrackWavebuf[secondsPlayed * deviceSampleRate], deviceSampleRate);
             queueSecond = 0;
             queueBufferToUse++;
             secondsPlayed++;
-            (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, 96000);
+            (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, deviceSampleRate*2);
             if (checkForSilence(queueBufferSilence)) secondsPlayed=trackLength; // force next track for normal playback
         } else {
             if (queueBufferToUse == 2 && queueSecond != 0) {
                 //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
-                memcpy(queueBuffer2, &fullTrackWavebuf[secondsPlayed * 48000], 96000);
+                memcpy(queueBuffer2, &fullTrackWavebuf[secondsPlayed * deviceSampleRate], deviceSampleRate*2);
                 //if (checkForSilence(queueBuffer2)) nextTrack(context);
-                (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer2, 96000);
+                (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer2, deviceSampleRate*2);
                 queueSecond = 0;
                 queueBufferToUse++;
                 secondsPlayed++;
             } else {
                 if (queueBufferToUse == 3 && queueSecond != 0) {
                     //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
-                    memcpy(queueBuffer3, &fullTrackWavebuf[secondsPlayed * 48000], 96000);
+                    memcpy(queueBuffer3, &fullTrackWavebuf[secondsPlayed * deviceSampleRate], deviceSampleRate*2);
                     //if (checkForSilence(queueBuffer3)) nextTrack(context);
-                    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer3, 96000);
+                    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer3, deviceSampleRate*2);
                     queueSecond = 0;
                     queueBufferToUse = 1;
                     secondsPlayed++;
@@ -223,17 +225,17 @@ void* generateAudioThread(void* context){
                     secondsToGenerate = secondsToGenerate - 2;
                 }
 
-                if (activeGameType == 0) KSSPLAY_calc(kssplay, &fullTrackWavebuf[(trackLength - secondsToGenerate) * 48000], 48000);
+                if (activeGameType == 0) KSSPLAY_calc(kssplay, &fullTrackWavebuf[(trackLength - secondsToGenerate) * deviceSampleRate], deviceSampleRate);
                     else {
                         gme_play(emu, 48000, wavebuf);
                         //gme_play(emu, 48000, wavebuf2);
-                        int i, n, even_index;
+                        /*int i, n, even_index;
                         n = 48000;
                         even_index = 0;
                         for(i=0;i<n;i++) // filling even and odd arrays
                         {
                             if((wavebuf[i]%2) == 0) spcwavebuf[even_index++] = wavebuf[i];
-                        }
+                        }*/
                     /*
                         for(i=0;i<n;i++) // filling even and odd arrays
                         {
@@ -348,7 +350,7 @@ void Java_nl_vlessert_vigamup_PlayerService_setKss(JNIEnv* env, jclass clazz, ch
         if ((kss = KSS_load_file(utf8File)) == NULL) {
             __android_log_print(ANDROID_LOG_INFO, "KSS", "Error loading... KSS...");
         }
-        kssplay = KSSPLAY_new(48000, 1, 16); // so frequency (48k) * channels (1) * bitrate (16) = 96000 bytes per second
+        kssplay = KSSPLAY_new(deviceSampleRate, 1, 16); // so frequency (48k) * channels (1) * bitrate (16) = 96000 bytes per second
         KSSPLAY_set_data(kssplay, kss);
         KSSPLAY_set_master_volume(kssplay,80); //on 100 it will overpower when increasing OPLL volume
         KSSPLAY_set_device_volume(kssplay,EDSC_PSG,20); //emphasise drums (mostly)
@@ -424,12 +426,12 @@ void Java_nl_vlessert_vigamup_PlayerService_startKssPlayback(JNIEnv* env, jclass
     //__android_log_print(ANDROID_LOG_INFO, "KSS", "Komt ie hier?!?!? %d", (int)sizeof(fullTrackWavebuf));
     if (fullTrackWavebuf!=NULL) free(fullTrackWavebuf);
     //__android_log_print(ANDROID_LOG_INFO, "KSS", "Hier dan?!?!? %d ", secondsToPlay);
-    fullTrackWavebuf = malloc(96000 * globalSecondsToPlay);
-    KSSPLAY_calc(kssplay, wavebuf, 48000);
-    KSSPLAY_calc(kssplay, wavebuf2, 48000);
+    fullTrackWavebuf = malloc(deviceSampleRate * 2 * globalSecondsToPlay);
+    KSSPLAY_calc(kssplay, wavebuf, deviceSampleRate);
+    KSSPLAY_calc(kssplay, wavebuf2, deviceSampleRate);
     //__android_log_print(ANDROID_LOG_INFO, "KSS", "Of hier....");
-    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf, 96000);
-    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf2, 96000);
+    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf, deviceSampleRate*2);
+    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf2, deviceSampleRate*2);
     //__android_log_print(ANDROID_LOG_INFO, "KSS", "En hier?!?!?");
     isPlaying = 1;
 }
@@ -566,6 +568,8 @@ void Java_nl_vlessert_vigamup_PlayerService_createBufferQueueAudioPlayer(JNIEnv*
                                                                            jclass clazz, jint sampleRate, jint bufSize) {
 
     __android_log_print(ANDROID_LOG_INFO, "KSS", "Creating the stuff...");
+
+    deviceSampleRate = sampleRate;
 
     SLresult result;
 
