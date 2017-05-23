@@ -1,5 +1,7 @@
 package nl.vlessert.vigamup;
 
+import android.os.Environment;
+
 public class Constants {
     public interface ACTION {
         public static String MAIN_ACTION = "nl.vlessert.vigamup.action.main";
@@ -34,4 +36,6 @@ public class Constants {
         int SNES = 1;
         int PC_DEMO_SCENE = 2;
     }
+
+    public static final String vigamupDirectory = Environment.getExternalStorageDirectory()+"/"+Environment.DIRECTORY_DOWNLOADS+"/ViGaMuP/";
 }

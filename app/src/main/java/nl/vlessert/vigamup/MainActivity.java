@@ -123,11 +123,15 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
     private boolean serviceDestroyed = false;
 
+    private HelperFunctions helpers;
+
     Window window;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        helpers = new HelperFunctions();
 
         window = getWindow();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -197,7 +201,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             public void onClick(View v) {
                 // TODO Auto-generated method stub
                 Log.v("ImageButton", "Clicked!");
-                Log.v(LOG_TAG, "Hmmm.... " + mPlayerService.getPaused());
+                //Log.v(LOG_TAG, "Hmmm.... " + mPlayerService.getPaused());
                 mPlayerService.togglePlaybackJava();
                 setPlayButtonInPlayerBar();
             }
@@ -301,6 +305,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         Log.d(LOG_TAG,"create receiver!!");
 
         downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+
     }
 
     @Override
@@ -385,6 +390,9 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             mPlayerService = myBinder.getService();
             mServiceBound = true;
 
+            Thread t = new Thread(new SpcTrackInfoGenerator(mPlayerService,"plok.rsn"));
+            t.start();
+
             gameCollection = mPlayerService.gameCollection;
             if (!gameListShowing){
                 mPlayerService.createGameCollection();
@@ -464,9 +472,9 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                         if (fileType.equals("kss")) {
                             fileName = barcode.displayValue.substring(barcode.displayValue.lastIndexOf("_") + 1, barcode.displayValue.length());
                             Log.d(LOG_TAG, "Filename: " + fileName);
-                            if (directoryExists("ViGaMuP/KSS/" + fileName))
-                                deleteDirectory("ViGaMuP/KSS/" + fileName);
-                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/KSS/" + fileName);
+                            if (helpers.directoryExists("KSS/" + fileName))
+                                helpers.deleteDirectory("KSS/" + fileName);
+                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "KSS/" + fileName);
 
                             downloadReference = downloadManager.enqueue(request);
                         } else {
@@ -483,9 +491,9 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                             //request.setTitle(intent.getStringExtra(barcode.displayValue));
                             String fileName = barcode.displayValue.substring(barcode.displayValue.lastIndexOf("=")+1)+".rsn";
 
-                            if (directoryExists("ViGaMuP/SPC/" + fileName)) deleteDirectory("ViGaMuP/SPC/" + fileName);
+                            if (helpers.directoryExists("SPC/" + fileName)) helpers.deleteDirectory("SPC/" + fileName);
 
-                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/SPC/" + fileName);
+                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "SPC/" + fileName);
                             downloadReference = downloadManager.enqueue(request);
                         } else {
                             Log.d(LOG_TAG, "Toast to report this is not a ViGaMuP file...");
@@ -575,15 +583,18 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     }
                     Toast.makeText(getApplicationContext(), "Download completed...", Toast.LENGTH_LONG).show();
                     if (name.contains("rsn")) { // must be snesmusic.. enqueue image download here... ugly, but don't want to find out multiple downloading as of yet..
-                            String game = name.substring(name.lastIndexOf("/")+1, name.lastIndexOf("."));
-                            String fileNameImage = "http://snesmusic.org/v2/images/screenshots/"+game+".png";
-                            Uri Download_Uri2 = Uri.parse(fileNameImage);
-                            DownloadManager.Request request2 = new DownloadManager.Request(Download_Uri2);
-                            request2.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
-                            request2.setAllowedOverRoaming(false);
-                            request2.setTitle(intent.getStringExtra(fileNameImage));
-                            request2.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/SPC/" + game + ".png");
-                            downloadReference = downloadManager.enqueue(request2);
+                        String game = name.substring(name.lastIndexOf("/")+1, name.lastIndexOf("."));
+                        String fileNameImage = "http://snesmusic.org/v2/images/screenshots/"+game+".png";
+                        Uri Download_Uri2 = Uri.parse(fileNameImage);
+                        DownloadManager.Request request2 = new DownloadManager.Request(Download_Uri2);
+                        request2.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
+                        request2.setAllowedOverRoaming(false);
+                        request2.setTitle(intent.getStringExtra(fileNameImage));
+                        request2.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/SPC/" + game + ".png");
+                        downloadReference = downloadManager.enqueue(request2);
+
+                        //Thread t = new Thread(new SpcTrackInfoGeneratorThread(game, mPlayerService));
+                        //t.start();
                     }
                 } else {
                     Log.i(LOG_TAG, "Download failed!");
@@ -594,13 +605,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             }
             c.close();
         }
-    }
-
-    private void unpackRsnTemporaryAndGenerateGameInfoFile(){
-        // unrar in /tmp
-        // get game & track info from spc files
-        // save trackfinfo and gameinfo files
-        // deletee extracted spc files
     }
 
     public static void unzip(File zipFile, File targetDirectory) throws IOException {
@@ -648,21 +652,22 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     REQUEST_WRITE_STORAGE);
             return false;
         } else {
-            if (directoryExists("ViGaMuP")) {
-                if (directoryExists("ViGaMuP/KSS")) {
-                    if (dirSize(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/KSS"))> 40000) musicFound = true;
+            if (helpers.baseDirectoryExists("ViGaMuP")) {
+                if (helpers.directoryExists("KSS")) {
+                    if (helpers.dirSize(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/KSS"))> 40000) musicFound = true;
                 } else {
-                    makeDirectory("ViGaMuP/KSS");
+                    helpers.makeDirectory("KSS");
                 }
-                if (directoryExists("ViGaMuP/SPC")) {
-                    if (dirSize(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/SPC"))> 40000) musicFound = true;
+                if (helpers.directoryExists("SPC")) {
+                    if (helpers.dirSize(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/SPC"))> 40000) musicFound = true;
                 } else {
-                    makeDirectory("ViGaMuP/SPC");
+                    helpers.makeDirectory("SPC");
                 }
             } else {
-                makeDirectory("ViGaMuP");
-                makeDirectory("ViGaMuP/KSS");
-                makeDirectory("ViGaMuP/SPC");
+                helpers.baseMakeDirectory("ViGaMuP");
+                helpers.makeDirectory("KSS");
+                helpers.makeDirectory("SPC");
+                helpers.makeDirectory("tmp");
             }
         }
         if (!musicFound) {
@@ -674,6 +679,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
     private void showMusicList(){
         gameCollection = mPlayerService.gameCollection;
+        gameCollection.createGameCollection(Constants.PLATFORM.MSX);
         /*FragmentManager fragmentManager = this.getSupportFragmentManager();
         gameList = (GameList) fragmentManager.findFragmentById(R.id.fragment1);
         gameList.updateGameList(gameCollection.getGameObjectsWithTrackInformation());*/
@@ -812,40 +818,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
             mLayout.setPanelState(SlidingUpPanelLayout.PanelState.EXPANDED);
         }
-    }
-
-    private boolean directoryExists(String directory) {
-        File folder = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + directory);
-        return folder.exists();
-    }
-
-    private boolean deleteDirectory(String directory) {
-        File folder = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + directory);
-        Log.d(LOG_TAG, "Delete: "+ directory);
-        return folder.delete();
-    }
-
-    private static long dirSize(File dir) {
-        if (dir.exists()) {
-            long result = 0;
-            File[] fileList = dir.listFiles();
-            for(int i = 0; i < fileList.length; i++) {
-                // Recursive call if it's a directory
-                if(fileList[i].isDirectory()) {
-                    result += dirSize(fileList [i]);
-                } else {
-                    // Sum the file size in bytes
-                    result += fileList[i].length();
-                }
-            }
-            return result; // return the file size
-        }
-        return 0;
-    }
-
-    private void makeDirectory(String directory){
-        File folder = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + directory);
-        Log.d(LOG_TAG, "create Downloads/"+ directory + "?: " + folder.mkdir());
     }
 
     @Override

@@ -635,6 +635,7 @@ public class PlayerService extends Service{
     public void playCurrentTrack() {
         Game game = gameCollection.getCurrentGame();
         setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+        alreadyPlaying = true;
         startKssPlayback();
         updateNotificationTitles();
         updateA2DPInfo();
@@ -918,5 +919,6 @@ public class PlayerService extends Service{
     public native void shutdown();
 
     public native void generateTrackInformation();
+    public native String generateSpcTrackInformation(String spcFile);
 
 }
