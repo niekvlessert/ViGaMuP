@@ -9,11 +9,16 @@ android {
         targetSdkVersion 25
         versionCode 1
         versionName "1.0"
+        multiDexEnabled true
         externalNativeBuild {
             cmake {
                 cppFlags ""
             }
         }
+    }
+    packagingOptions {
+        pickFirst  'META-INF/LICENSE'
+        pickFirst  'META-INF/DEPENDENCIES'
     }
     buildTypes {
         release {
@@ -34,14 +39,14 @@ android {
 }
 
 dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
+    compile fileTree(include: ['*.jar'], dir: 'libs')
     compile 'com.android.support:appcompat-v7:25.3.1'
     compile 'com.android.support:design:25.3.1'
     compile 'com.google.android.gms:play-services-vision:10.2.1'
+    compile 'com.github.junrar:junrar:0.7'
     repositories {
         mavenCentral()
     }
     compile 'com.sothree.slidinguppanel:library:3.3.1'
-
     testCompile 'junit:junit:4.12'
 }

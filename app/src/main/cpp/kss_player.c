@@ -359,6 +359,7 @@ void Java_nl_vlessert_vigamup_PlayerService_setKss(JNIEnv* env, jclass clazz, ch
 
         __android_log_print(ANDROID_LOG_INFO, "KSS", "FMPAC enabled: %d", kss->fmpac);
     }
+    (*env)->ReleaseStringUTFChars(env, file, utf8File);
 }
 
 jboolean Java_nl_vlessert_vigamup_PlayerService_togglePlayback(JNIEnv* env, jclass clazz) {
@@ -440,34 +441,16 @@ void Java_nl_vlessert_vigamup_PlayerService_startSpcPlayback(JNIEnv* env, jclass
     activeGameType = 5;
     spcwavebuf = malloc(96000);
 
-    gme_open_file( "/sdcard/Download/ViGaMuP/spc/ct-112.spc", &emu, 24000 );
+    gme_open_file( "/sdcard/Download/ViGaMuP/spc/plok-01.spc", &emu, deviceSampleRate/2 );
     gme_start_track( emu, 0);
-    //int16_t *wavebuffer, *wavebuffer2, *wavebuffer3, *wavebuffer4;
-    //wavebuffer = malloc(96000);
-    //wavebuffer2 = malloc(96000);
 
-    fullTrackWavebuf = malloc(96000 * 100);
+    fullTrackWavebuf = malloc(deviceSampleRate* 2 * 200);
 
-    gme_play(emu, 48000, wavebuf);
-    gme_play(emu, 48000, wavebuf2);
+    gme_play(emu, deviceSampleRate, wavebuf);
+    gme_play(emu, deviceSampleRate, wavebuf2);
 
-    int16_t *wavebufeven;
-    wavebufeven = malloc(96000);
-
-    int i, n, even_index;
-    n = 48000;
-    even_index = 0;
-    for(i=0;i<n;i++) // filling even and odd arrays
-    {
-        if((wavebuf[i]%2) == 0) wavebufeven[even_index++] = wavebuf[i] + wavebuf[i+1];
-    }
-    for(i=0;i<n;i++) // filling even and odd arrays
-    {
-        if((wavebuf2[i]%2) == 0) wavebufeven[even_index++] = wavebuf2[i] + wavebuf[i+1];
-    }
-
-    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebufeven, 96000);
-    //(*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf2, 96000);
+    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf, deviceSampleRate*2);
+    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf2, deviceSampleRate*2);
 
     /*wavebuffer3 = malloc(96000);
     wavebuffer4 = malloc(96000);
@@ -553,14 +536,14 @@ void Java_nl_vlessert_vigamup_PlayerService_createEngine(JNIEnv* env, jobject in
 
     //pthread_join(t1,NULL);
 
-    queueBuffer1 = malloc(96000);
-    queueBuffer2 = malloc(96000);
-    queueBuffer3 = malloc(96000);
-    queueBufferSilence = malloc(48000);
+    queueBuffer1 = malloc(deviceSampleRate*2);
+    queueBuffer2 = malloc(deviceSampleRate*2);
+    queueBuffer3 = malloc(deviceSampleRate*2);
+    queueBufferSilence = malloc(deviceSampleRate);
     fullTrackWavebuf = NULL;
 
-    wavebuf = malloc(48000 * sizeof(int16_t));
-    wavebuf2 = malloc(96000);
+    wavebuf = malloc(deviceSampleRate * sizeof(int16_t));
+    wavebuf2 = malloc(deviceSampleRate*2);
 }
 
 // create buffer queue audio player
@@ -834,5 +817,47 @@ void Java_nl_vlessert_vigamup_PlayerService_generateTrackInformation(JNIEnv* env
         free (tempWavebuf2);
         free (tempWavebuf3);
     //}
+}
+
+void handle_error( const char* str ) {
+    if (str) {
+        __android_log_print(ANDROID_LOG_INFO, "KSS", "Error: %s\n", str);
+        getchar();
+    }
+}
+
+jstring Java_nl_vlessert_vigamup_PlayerService_generateSpcTrackInformation(JNIEnv* env, jclass clazz, char *file) {
+    const char *utf8File = (*env)->GetStringUTFChars(env, file, NULL);
+    char fullPath[1024];
+    char spcInfoString[1024];
+    char length[5];
+
+    strcpy (fullPath, "/sdcard/Download/ViGaMuP/tmp/");
+    strcat (fullPath, utf8File);
+    //__android_log_print(ANDROID_LOG_INFO, "KSS", "fullpath: %s",fullPath);
+
+    handle_error( gme_open_file(fullPath, &emu, gme_info_only ) );
+    gme_info_t* info;
+    handle_error( gme_track_info( emu, &info, 0 ) );
+
+    strcpy (spcInfoString, info->song);
+    strcat (spcInfoString, ";");
+    strcat (spcInfoString, info->game);
+    strcat (spcInfoString, ";");
+    strcat (spcInfoString, info->author);
+    strcat (spcInfoString, ";");
+    strcat (spcInfoString, info->copyright);
+    strcat (spcInfoString, ";");
+
+    // length in seconden moet nog van int naar string
+    sprintf (length, "%d", (long) info->length/1000);
+    strcat (spcInfoString, length);
+
+    gme_free_info( info );
+    (*env)->ReleaseStringUTFChars(env, file, utf8File);
+    return (*env)->NewStringUTF(env, spcInfoString);
+    //free (fullPath);
+    //free (spcInfoString);
+
 }
 
