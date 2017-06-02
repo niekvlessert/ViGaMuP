@@ -48,7 +48,6 @@ int isBuffering = 0;
 int16_t *fullTrackWavebuf;
 int16_t *wavebuf;
 int16_t *wavebuf2;
-int16_t *spcwavebuf;
 int nextMessageSend = 0;
 int terminateThread = 0;
 int threadTerminated = 0;
@@ -112,7 +111,7 @@ void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
     //__android_log_print(ANDROID_LOG_INFO, "KSS", "Callback called!!");
 }
 
-void nextTrack(void* context){
+/*void nextTrack(void* context){
     TickContext *pctx = (TickContext*) context;
     JavaVM *javaVM = pctx->javaVM;
     JNIEnv *env;
@@ -123,10 +122,10 @@ void nextTrack(void* context){
         if (JNI_OK != res) {
             __android_log_print(ANDROID_LOG_INFO, "KSS", "Failed to AttachCurrentThread, ErrorCode = %d", res);
         }
-    }*/
+    }
     jmethodID nextTrackId = (*env)->GetMethodID(env, pctx->PlayerServiceClz, "nextTrack", "()V");
     (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, nextTrackId);
-}
+}*/
 
 int checkForSilence(int16_t* queueBuffer){
     long sum = 0;
@@ -147,17 +146,19 @@ int checkForSilence(int16_t* queueBuffer){
 int queueSecondIfRequired(void *context){
     if (queueSecond && secondsPlayed<trackLength) {
         if (queueBufferToUse == 1) {
-            //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
+            __android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
             memcpy(queueBuffer1, &fullTrackWavebuf[secondsPlayed * deviceSampleRate], deviceSampleRate*2);
             memcpy(queueBufferSilence, (int8_t *) &fullTrackWavebuf[secondsPlayed * deviceSampleRate], deviceSampleRate);
             queueSecond = 0;
             queueBufferToUse++;
             secondsPlayed++;
             (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, deviceSampleRate*2);
-            if (checkForSilence(queueBufferSilence)) secondsPlayed=trackLength; // force next track for normal playback
+            if (activeGameType==0) {
+                if (checkForSilence(queueBufferSilence)) secondsPlayed=trackLength;
+            } // force next track for normal playback
         } else {
             if (queueBufferToUse == 2 && queueSecond != 0) {
-                //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
+                __android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
                 memcpy(queueBuffer2, &fullTrackWavebuf[secondsPlayed * deviceSampleRate], deviceSampleRate*2);
                 //if (checkForSilence(queueBuffer2)) nextTrack(context);
                 (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer2, deviceSampleRate*2);
@@ -166,7 +167,7 @@ int queueSecondIfRequired(void *context){
                 secondsPlayed++;
             } else {
                 if (queueBufferToUse == 3 && queueSecond != 0) {
-                    //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
+                    __android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
                     memcpy(queueBuffer3, &fullTrackWavebuf[secondsPlayed * deviceSampleRate], deviceSampleRate*2);
                     //if (checkForSilence(queueBuffer3)) nextTrack(context);
                     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer3, deviceSampleRate*2);
@@ -219,30 +220,16 @@ void* generateAudioThread(void* context){
                 if (!initialDataCopied) {
                     //__android_log_print(ANDROID_LOG_INFO, "KSS", "copy initial data to array!");
                     initialDataCopied = 1;
-                    memcpy(fullTrackWavebuf, wavebuf, 96000);
-                    memcpy((int8_t *) &fullTrackWavebuf[48000], wavebuf2, 96000);
+                    memcpy(fullTrackWavebuf, wavebuf, deviceSampleRate*2);
+                    memcpy(&fullTrackWavebuf[deviceSampleRate], wavebuf2, deviceSampleRate*2);
                     secondsPlayed = 2;
                     secondsToGenerate = secondsToGenerate - 2;
                 }
 
                 if (activeGameType == 0) KSSPLAY_calc(kssplay, &fullTrackWavebuf[(trackLength - secondsToGenerate) * deviceSampleRate], deviceSampleRate);
                     else {
-                        gme_play(emu, 48000, wavebuf);
-                        //gme_play(emu, 48000, wavebuf2);
-                        /*int i, n, even_index;
-                        n = 48000;
-                        even_index = 0;
-                        for(i=0;i<n;i++) // filling even and odd arrays
-                        {
-                            if((wavebuf[i]%2) == 0) spcwavebuf[even_index++] = wavebuf[i];
-                        }*/
-                    /*
-                        for(i=0;i<n;i++) // filling even and odd arrays
-                        {
-                            if((wavebuf2[i]%2) == 0) spcwavebuf[even_index++] = wavebuf2[i];
-                        }
-                        */
-                        memcpy(&fullTrackWavebuf[(trackLength - secondsToGenerate) * 48000], wavebuf, 96000);
+                        gme_play(emu, deviceSampleRate, &fullTrackWavebuf[(trackLength - secondsToGenerate) * deviceSampleRate]);
+                        //memcpy(&fullTrackWavebuf[(trackLength - secondsToGenerate) * deviceSampleRate], wavebuf, 96000);
                     }
 
                 (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setBufferBarProgressId);
@@ -263,7 +250,9 @@ void* generateAudioThread(void* context){
                                     nextMessageSend, secondsPlayed, trackLength);
                 sleep(2);
 
-                (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, nextTrackId);
+                //if (activeGameType == 0) {
+                    (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, nextTrackId);
+                //}
 
                 nextMessageSend = 1;
             }
@@ -349,6 +338,7 @@ void Java_nl_vlessert_vigamup_PlayerService_setKss(JNIEnv* env, jclass clazz, ch
 
         if ((kss = KSS_load_file(utf8File)) == NULL) {
             __android_log_print(ANDROID_LOG_INFO, "KSS", "Error loading... KSS...");
+            return;
         }
         kssplay = KSSPLAY_new(deviceSampleRate, 1, 16); // so frequency (48k) * channels (1) * bitrate (16) = 96000 bytes per second
         KSSPLAY_set_data(kssplay, kss);
@@ -424,33 +414,73 @@ void Java_nl_vlessert_vigamup_PlayerService_startKssPlayback(JNIEnv* env, jclass
     secondsToGenerate = globalSecondsToPlay;
     if (globalSecondsToPlay==1) globalSecondsToPlay=3;
     trackLength = globalSecondsToPlay;
-    //__android_log_print(ANDROID_LOG_INFO, "KSS", "Komt ie hier?!?!? %d", (int)sizeof(fullTrackWavebuf));
+
     if (fullTrackWavebuf!=NULL) free(fullTrackWavebuf);
-    //__android_log_print(ANDROID_LOG_INFO, "KSS", "Hier dan?!?!? %d ", secondsToPlay);
     fullTrackWavebuf = malloc(deviceSampleRate * 2 * globalSecondsToPlay);
+
     KSSPLAY_calc(kssplay, wavebuf, deviceSampleRate);
     KSSPLAY_calc(kssplay, wavebuf2, deviceSampleRate);
-    //__android_log_print(ANDROID_LOG_INFO, "KSS", "Of hier....");
+
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf, deviceSampleRate*2);
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf2, deviceSampleRate*2);
-    //__android_log_print(ANDROID_LOG_INFO, "KSS", "En hier?!?!?");
+
     isPlaying = 1;
 }
 
-void Java_nl_vlessert_vigamup_PlayerService_startSpcPlayback(JNIEnv* env, jclass clazz) {
+void Java_nl_vlessert_vigamup_PlayerService_startSpcPlayback(JNIEnv* env, jclass clazz, char *file, int secondsToPlay) {
+    const char *utf8File = (*env)->GetStringUTFChars(env, file, NULL);
+
+    initialDataCopied = 0;
+    generatingAllowed = 0;
+    queueSecond = 0;
+    secondsPlayed = 0;
+    secondsToGenerate = secondsToPlay;
+    trackLength = secondsToPlay;
+    //globalTrackNumber = trackNr;
+    skipToNextTrack = 0;
     activeGameType = 5;
-    spcwavebuf = malloc(96000);
 
-    gme_open_file( "/sdcard/Download/ViGaMuP/spc/plok-01.spc", &emu, deviceSampleRate/2 );
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Is playing: %d\n", isPlaying);
+
+    if (isPlaying) {
+        isPlaying=0;
+        while (isBuffering){
+            usleep(100);
+        }
+        pthread_mutex_lock(&lock);
+
+        SLresult result = (*bqPlayerBufferQueue)->Clear(bqPlayerBufferQueue);
+        if (SL_RESULT_SUCCESS != result) {
+            __android_log_print(ANDROID_LOG_INFO, "KSS", "Clear failed at begin of OpenSL_startRecording()() result=%d\n", result);
+            return;
+        }
+        pthread_mutex_unlock(&lock);
+
+        gme_delete( emu );
+        __android_log_print(ANDROID_LOG_INFO, "KSS", "Deleteee ");
+        free (wavebuf);
+        free (wavebuf2);
+    }
+
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Hier dan?!?!? 1 %s", utf8File);
+    wavebuf = malloc (96000);
+    wavebuf2 = malloc (96000);
+
+    gme_open_file(utf8File, &emu, deviceSampleRate ); // divided by 2?? stereo???
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Hier dan?!?!? 2 ");
     gme_start_track( emu, 0);
+    //gme_set_fade( emu, (secondsToPlay-2)*1000);
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Hier dan?!?!? 3 ");
 
-    fullTrackWavebuf = malloc(deviceSampleRate* 2 * 200);
+    fullTrackWavebuf = malloc(deviceSampleRate * 2 * secondsToPlay);
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Hier dan?!?!? 4 ");
 
     gme_play(emu, deviceSampleRate, wavebuf);
     gme_play(emu, deviceSampleRate, wavebuf2);
 
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf, deviceSampleRate*2);
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf2, deviceSampleRate*2);
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "Hier dan?!?!? 6 ");
 
     /*wavebuffer3 = malloc(96000);
     wavebuffer4 = malloc(96000);
@@ -461,9 +491,8 @@ void Java_nl_vlessert_vigamup_PlayerService_startSpcPlayback(JNIEnv* env, jclass
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuffer4, 96000);*/
 
     //gme_delete( emu );
-    secondsToGenerate = 100;
     isPlaying = 1;
-    trackLength = 100;
+    //trackLength = 100;
 
 }
 
@@ -543,7 +572,7 @@ void Java_nl_vlessert_vigamup_PlayerService_createEngine(JNIEnv* env, jobject in
     fullTrackWavebuf = NULL;
 
     wavebuf = malloc(deviceSampleRate * sizeof(int16_t));
-    wavebuf2 = malloc(deviceSampleRate*2);
+    wavebuf2 = malloc(deviceSampleRate * sizeof(int16_t));
 }
 
 // create buffer queue audio player
@@ -569,9 +598,13 @@ void Java_nl_vlessert_vigamup_PlayerService_createBufferQueueAudioPlayer(JNIEnv*
         // configure audio source
         SLDataLocator_AndroidSimpleBufferQueue loc_bufq = {SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE,
                                                            2};
-        SLDataFormat_PCM format_pcm = {SL_DATAFORMAT_PCM, 1, SL_SAMPLINGRATE_8,
+        /*SLDataFormat_PCM format_pcm = {SL_DATAFORMAT_PCM, 1, SL_SAMPLINGRATE_8,
                                        SL_PCMSAMPLEFORMAT_FIXED_16, SL_PCMSAMPLEFORMAT_FIXED_16,
-                                       SL_SPEAKER_FRONT_CENTER, SL_BYTEORDER_LITTLEENDIAN};
+                                       SL_SPEAKER_FRONT_CENTER, SL_BYTEORDER_LITTLEENDIAN};*/ //8 bit, 1
+
+        SLDataFormat_PCM format_pcm = {SL_DATAFORMAT_PCM, 2, SL_SAMPLINGRATE_44_1,
+                                       SL_PCMSAMPLEFORMAT_FIXED_16, SL_PCMSAMPLEFORMAT_FIXED_16,
+                                       SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT, SL_BYTEORDER_LITTLEENDIAN};
         /*
          * Enable Fast Audio when possible:  once we set the same rate to be the native, fast audio path
          * will be triggered

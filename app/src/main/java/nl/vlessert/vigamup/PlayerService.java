@@ -303,7 +303,7 @@ public class PlayerService extends Service{
 
     private void createNotification(int bigViewType){
         currentBigViewType = bigViewType;
-        Log.d(LOG_TAG, "hmmm: " +currentBigViewType);
+        //Log.d(LOG_TAG, "hmmm: " +currentBigViewType);
 
         Log.i(LOG_TAG, "Received Start Foreground Intent ");
         Intent notificationIntent = new Intent(this, MainActivity.class);
@@ -403,7 +403,7 @@ public class PlayerService extends Service{
         notification = mNotificationCompatBuilder.build();
 
         int repeatModeIcon = R.drawable.img_btn_repeat;
-        Log.d(LOG_TAG, "repeatmode: " + repeatMode);
+        //Log.d(LOG_TAG, "repeatmode: " + repeatMode);
         switch(repeatMode) {
             case Constants.REPEAT_MODES.NORMAL_PLAYBACK:
                 repeatModeIcon = R.drawable.img_btn_repeat;
@@ -425,19 +425,26 @@ public class PlayerService extends Service{
     }
 
     public void setPlayingStatePlaying() {
-        NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        //Thread t = new Thread(new Runnable() {
+            //public void run() {
+                NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
-        views.setImageViewResource(R.id.status_bar_play,
-                android.R.drawable.ic_media_pause);
-        bigViews.setImageViewResource(R.id.status_bar_play,
-                android.R.drawable.ic_media_pause);
+                views.setImageViewResource(R.id.status_bar_play,
+                        android.R.drawable.ic_media_pause);
+                bigViews.setImageViewResource(R.id.status_bar_play,
+                        android.R.drawable.ic_media_pause);
 
-        Log.d(LOG_TAG, "setPlayingStatePlaying");
+                Log.d(LOG_TAG, "setPlayingStatePlaying");
 
-        mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
-        notificationPlaying = true;
+                mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
+                notificationPlaying = true;
 
-        updateA2DPPlayState(true);
+                updateA2DPPlayState(true);
+            //}
+        //});
+
+        //t.start();
+        //try { t.join(); } catch (InterruptedException ie){}
     }
 
     public void setPlayingStatePause() {
@@ -520,9 +527,9 @@ public class PlayerService extends Service{
 
     public void createGameCollection(){
         Log.d(LOG_TAG,"has game collection?: " +hasGameCollection);
-        if (!hasGameCollection || gameCollection.getCount()==0) {
+        if (!hasGameCollection) {
             gameCollection = new GameCollection(this);
-            gameCollection.createGameCollection(Constants.PLATFORM.MSX);
+            gameCollection.createGameCollection();
             hasGameCollection = true;
 
             Intent startIntent = new Intent();
@@ -535,6 +542,7 @@ public class PlayerService extends Service{
 
     private void nextTrack() {
         fixUninitialized();
+        Game game = gameCollection.getCurrentGame();
 
         Log.d(LOG_TAG,"Next track called..." + Debug.getNativeHeapAllocatedSize() + " and " + Debug.getNativeHeapSize());
         Log.d(LOG_TAG,"game: " + currentGame.getTitle());
@@ -549,7 +557,7 @@ public class PlayerService extends Service{
                     currentGame = gameCollection.getCurrentGame();
                     currentGame.setFirstTrack();
                     Log.d(LOG_TAG, "Game in service: " + currentGame.title + " " + currentGame.position);
-                    setKssJava(currentGame.musicFileC);
+                    if (game.getMusicType()==0) setKssJava(currentGame.musicFileC);
                 }
                 break;
             case Constants.REPEAT_MODES.LOOP_GAME:
@@ -567,18 +575,27 @@ public class PlayerService extends Service{
                 gameCollection.setCurrentGame(Integer.parseInt(gameAndTrackInfoArray[0]));
                 currentGame = gameCollection.getCurrentGame();
                 currentGame.setTrack(Integer.parseInt(gameAndTrackInfoArray[1]));
-                setKssJava(currentGame.musicFileC);
+                if (game.getMusicType()==0) setKssJava(currentGame.musicFileC);
                 Log.d(LOG_TAG,"gameAndTrackInfo: " + gameAndTrackInfo);
                 break;
         }
 
         Log.d(LOG_TAG, "Randomizer: " + randomizer);
 
-        setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
-
-        if (!paused) {
-            alreadyPlaying = true;
-            startKssPlayback();
+        switch (game.getMusicType()){
+            case 0:
+                setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
+                if (!paused) {
+                    alreadyPlaying = true;
+                    startKssPlayback();
+                }
+                break;
+            case 1:
+                secondsPlayedFromCurrentTrack = 0;
+                secondsBufferedFromCurrentTrack = 0;
+                currentGame.extractCurrentSpcTrackfromRSN();
+                startSpcPlayback(currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackLength());
+                break;
         }
 
         Intent intent = new Intent("setSlidingUpPanelWithGame");
@@ -634,12 +651,35 @@ public class PlayerService extends Service{
 
     public void playCurrentTrack() {
         Game game = gameCollection.getCurrentGame();
-        setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+        switch (game.getMusicType()){
+            case 0:
+                setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+                startKssPlayback();
+                break;
+            case 1:
+                game.extractCurrentSpcTrackfromRSN();
+                startSpcPlayback(game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackLength());
+                break;
+        }
         alreadyPlaying = true;
-        startKssPlayback();
         updateNotificationTitles();
         updateA2DPInfo();
         setPlayingStatePlaying();
+        if (paused) paused = togglePlayback();
+    }
+
+    public void playSpc(String fileName){
+        Game game = gameCollection.getCurrentGame();
+        secondsPlayedFromCurrentTrack = 0;
+        secondsBufferedFromCurrentTrack = 0;
+
+        //game.extractCurrentSpcTrackfromRSN();
+        startSpcPlayback(fileName, game.getCurrentTrackLength());
+
+        updateNotificationTitles();
+        updateA2DPInfo();
+        setPlayingStatePlaying();
+
         if (paused) paused = togglePlayback();
     }
 
@@ -685,33 +725,46 @@ public class PlayerService extends Service{
     private void fixUninitialized(){
         if (!hasGameCollection) createGameCollection();
         currentGame = gameCollection.getCurrentGame();
-        if (!kssSet) {
-            setKssJava(currentGame.musicFileC);
-            setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
-        }
-        if (!kssTrackSet) {
-            setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
+        switch (currentGame.getMusicType()) {
+            case 0:
+                if (!kssSet) {
+                    setKssJava(currentGame.musicFileC);
+                    setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
+                }
+                if (!kssTrackSet) {
+                    setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
+                }
+                break;
         }
     }
 
     public void togglePlaybackJava(){
         fixUninitialized();
+        Game game = gameCollection.getCurrentGame();
 
         if (repeatMode == Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM && justStarted){
             nextTrack();
             justStarted = false;
         }
 
-        Log.d("KSS","alreadPlaying...: " + alreadyPlaying);
+        Log.d(LOG_TAG,"alreadyPlaying...: " + alreadyPlaying + ", Musictype: " + game.getMusicType());
 
         if (!alreadyPlaying) {
-            startKssPlayback();
+            switch (game.getMusicType()){
+                case 0:
+                    startKssPlayback();
+                    break;
+                case 1:
+                    game.extractCurrentSpcTrackfromRSN();
+                    startSpcPlayback(game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackLength());
+                    break;
+            }
             alreadyPlaying = true;
         }
 
         paused = togglePlayback();
         if (paused) setPlayingStatePause(); else setPlayingStatePlaying();
-        Log.d("KSS","togglePlaybackJava...: " + notificationPlaying);
+        Log.d(LOG_TAG,"togglePlaybackJava...: " + notificationPlaying);
 
         updateNotificationTitles();
         updateA2DPInfo();
@@ -898,10 +951,6 @@ public class PlayerService extends Service{
         setKssProgress(progress);
     }
 
-    public void playSpc(){
-        Log.d(LOG_TAG, "Kom ik hier??!");
-        startSpcPlayback();
-    }
 
     public boolean getPaused(){
         return paused;
@@ -912,7 +961,7 @@ public class PlayerService extends Service{
     public static native void setKss(String file);
     public static native void setKssTrack(int track, int length);
     public static native void startKssPlayback();
-    public static native void startSpcPlayback();
+    public static native void startSpcPlayback(String fileName, int length);
     public static native boolean togglePlayback();
     public static native boolean toggleLoopTrack();
     public native void setKssProgress(int progress);

@@ -1,7 +1,9 @@
 package nl.vlessert.vigamup;
 
 import android.content.Context;
+import android.content.IntentFilter;
 import android.os.Environment;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -9,13 +11,14 @@ import android.widget.BaseAdapter;
 import android.widget.TextView;
 
 import java.io.File;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.TreeSet;
 
-public class GameCollection extends BaseAdapter {
+public class GameCollection{
     private int activeGame = 0;
     private ArrayList<Game> gameObjects;
     private ArrayList<Game> gameObjectsWithTrackInformation;
@@ -27,54 +30,43 @@ public class GameCollection extends BaseAdapter {
 
     private final String LOG_TAG = "ViGaMuP game collection";
 
-    private static final int NO_TRACK_INFORMATION = 0;
-    private static final int TRACK_INFORMATION = 1;
+    private ArrayList<Integer> foundMusicTypes = new ArrayList<>();
 
-    private ArrayList mData = new ArrayList();
-    private LayoutInflater mInflater;
+    private int musicTypeToDisplay = 0;
 
-    private TreeSet mSeparatorsSet = new TreeSet();
-
-    public GameCollection(Context ctx, LayoutInflater layoutInflater){
-        this.ctx = ctx;
-        mInflater = layoutInflater;
+    public void setMusicTypeToDisplay(int musicType) {
+        this.musicTypeToDisplay = musicType;
     }
 
     public GameCollection(Context ctx){
         this.ctx = ctx;
     }
 
-    public void createGameCollection(int platformAndGameType){
-        switch (platformAndGameType) {
-            case Constants.PLATFORM.MSX:
-                File parentDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/KSS/");
-                gameObjects = new ArrayList<>();
-                File[] files = parentDir.listFiles();
-                String[] strings;
-                int position = 0;
-                for (File file : files) {
-                    if(file.getName().endsWith(".kss")){
-                        strings = file.getName().split("\\.");
-                        gameObjects.add(new Game(strings[0], strings[1].toUpperCase(), ctx, position));
-                        position++;
-                    }
-                }
-                break;
-            case Constants.PLATFORM.SNES:
-                parentDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/SPC/");
-                gameObjects = new ArrayList<>();
-                files = parentDir.listFiles();
-                position = 0;
-                for (File file : files) {
-                    if(file.getName().endsWith(".spc")){
-                        strings = file.getName().split("\\.");
-                        gameObjects.add(new Game(strings[0], strings[1].toUpperCase(), ctx, position));
-                        position++;
-                    }
-                }
+    public void createGameCollection() {
+        File parentDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/KSS/");
+        gameObjects = new ArrayList<>();
+        File[] files = parentDir.listFiles();
+        String[] strings;
+        int position = 0;
+        for (File file : files) {
+            if(file.getName().endsWith(".kss")){
+                strings = file.getName().split("\\.");
+                gameObjects.add(new Game(strings[0], Constants.PLATFORM.MSX, ctx, position));
+                position++;
+            }
         }
-
-
+        if (position>0) foundMusicTypes.add(Constants.PLATFORM.MSX);
+        int storedPosition = position;
+        parentDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/SPC/");
+        files = parentDir.listFiles();
+        for (File file : files) {
+            if(file.getName().endsWith(".rsn")){
+                strings = file.getName().split("\\.");
+                gameObjects.add(new Game(strings[0], Constants.PLATFORM.SNES, ctx, position));
+                position++;
+            }
+        }
+        if (position>storedPosition) foundMusicTypes.add(Constants.PLATFORM.SNES);
 
         gameObjectsWithTrackInformation = new ArrayList<>();
         gameObjectsWithoutTrackInformation = new ArrayList<>();
@@ -115,6 +107,8 @@ public class GameCollection extends BaseAdapter {
     }
 
     public Game getGameAtPosition(int position){ return gameObjectsWithTrackInformation.get(position); }
+    //public Game getGameAtPosition(int position){ return gameObjects.get(position); }
+
 
     public void setNextGame(){
         if (activeGame == gameObjectsWithTrackInformation.size()-1) activeGame = 0;
@@ -148,72 +142,8 @@ public class GameCollection extends BaseAdapter {
         return randomizedGameAndTrackList.get(randomizedGameAndTrackListPosition);
     }
 
-    @Override
-    public Game getItem(int position) {
-        return gameObjects.get(position);
-    }
-
-    @Override
-    public long getItemId(int position) {
-        return position;
-    }
-
-    @Override
-    public int getViewTypeCount() {
-        return 2;
-    }
-
-    @Override
-    public int getCount() {
-        return gameObjects.size();
-    }
-
-    @Override
-    public int getItemViewType(int position) {
-        return gameObjects.get(position).hasTrackInformationList() ? TRACK_INFORMATION : NO_TRACK_INFORMATION;
-    }
-
-    @Override
-    public View getView(int position, View convertView, ViewGroup parent) {
-        MultipleItemsList.ViewHolder holder;
-        int type = getItemViewType(position);
-        if (convertView == null) {
-            holder = new MultipleItemsList.ViewHolder();
-
-            switch (type) {
-                case NO_TRACK_INFORMATION:
-                    convertView = mInflater.inflate(R.layout.gamelist_item, null);
-
-                    holder.textView = (TextView)convertView.findViewById(R.id.text);
-                    holder.textView2 = (TextView)convertView.findViewById(R.id.text2);
-
-                    holder.textView2.setText("No track information, click to let ViGaMup generate it...");
-
-                    break;
-                case TRACK_INFORMATION:
-                    convertView = mInflater.inflate(R.layout.gamelist_item, null);
-
-                    holder.textView = (TextView)convertView.findViewById(R.id.text);
-                    holder.textView2 = (TextView)convertView.findViewById(R.id.text2);
-
-                    String information = gameObjects.get(position).getTotalPLayTimeHumanReadable();
-                    if (gameObjects.get(position).getVendorAndYear().length()>0) {
-                        information = information.concat("\n"+gameObjects.get(position).getVendorAndYear());
-                        //holder2.textView.setHeight(300);
-                    }
-                    holder.textView2.setText(information);
-
-                    break;
-            }
-
-            //if (position==5) holder.textView.setBackgroundColor(0xfff00000);
-            convertView.setTag(holder);
-
-        } else {
-            holder = (MultipleItemsList.ViewHolder)convertView.getTag();
-        }
-        holder.textView.setText(gameObjects.get(position).getTitle());
-        return convertView;
+    public ArrayList<Integer> getFoundMusicTypes(){
+        return foundMusicTypes;
     }
 }
 

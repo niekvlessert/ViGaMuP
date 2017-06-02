@@ -66,6 +66,61 @@ public class ExtractArchive {
         }
     }
 
+    public void extractFileFromArchive(File archive, File fileNameToExtract, File destination){
+        Archive arch = null;
+        OutputStream nullOutputStream = new OutputStream() { @Override public void write(int b) { } };
+
+        try {
+            arch = new Archive(archive);
+        } catch (RarException e) {
+            logError(e);
+        } catch (IOException e1) {
+            logError(e1);
+        }
+        if (arch != null) {
+            if (arch.isEncrypted()) {
+                logWarn("archive is encrypted cannot extreact");
+                return;
+            }
+            FileHeader fh = null;
+            while (true) {
+                fh = arch.nextFileHeader();
+                if (fh == null) {
+                    break;
+                }
+                String fileNameString = fh.getFileNameString();
+                if (fh.isEncrypted()) {
+                    logWarn("file is encrypted cannot extract: " + fileNameString);
+                    continue;
+                }
+                //Log.d(LOG_TAG, "fileNameToExtract: "+ fileNameToExtract + ", fileNameString: " + fileNameString);
+                if (fileNameToExtract.toString().equals(fileNameString)) {
+                    logInfo("extracting: " + fileNameString);
+                    try {
+                        if (fh.isDirectory()) {
+                            createDirectory(fh, destination);
+                        } else {
+                            File f = createFile(fh, destination);
+                            OutputStream stream = new FileOutputStream(f);
+                            arch.extractFile(fh, stream);
+                            stream.close();
+                        }
+                    } catch (IOException e) {
+                        logError(e, "error extracting the file");
+                    } catch (RarException e) {
+                        logError(e, "error extraction the file");
+                    }
+                } else {
+                    try {
+                        arch.extractFile(fh, nullOutputStream);
+                    } catch (RarException e) {
+                        logError(e, "error extraction the file");
+                    }
+                }
+            }
+        }
+    }
+
     private void logWarn(String warning) {
         Log.d(LOG_TAG, warning);
     }

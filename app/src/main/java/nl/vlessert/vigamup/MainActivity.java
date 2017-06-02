@@ -60,6 +60,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -68,7 +69,7 @@ import nl.vlessert.vigamup.barcode.BarcodeCaptureActivity;
 
 import nl.vlessert.vigamup.PlayerService.MyBinder;
 
-public class MainActivity extends AppCompatActivity implements GameList.OnGameSelectedListener{
+public class MainActivity extends AppCompatActivity{ //implements GameList.OnGameSelectedListener{
 
     private static final String LOG_TAG = "ViGaMuP";
 
@@ -105,9 +106,9 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
     private boolean initialized = false;
 
-    GameList gameList;
+    //GameList gameList;
 
-    private GameCollection gameCollection;
+    public GameCollection gameCollection;
     private boolean gameListShowing = false;
 
     private boolean globalSetNewKss = false;
@@ -390,8 +391,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
             mPlayerService = myBinder.getService();
             mServiceBound = true;
 
-            Thread t = new Thread(new SpcTrackInfoGenerator(mPlayerService,"plok.rsn"));
-            t.start();
+            //Thread t = new Thread(new SpcTrackInfoGenerator(mPlayerService,"plok.rsn", getApplicationContext()));
+            //t.start();
 
             gameCollection = mPlayerService.gameCollection;
             if (!gameListShowing){
@@ -474,7 +475,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                             Log.d(LOG_TAG, "Filename: " + fileName);
                             if (helpers.directoryExists("KSS/" + fileName))
                                 helpers.deleteDirectory("KSS/" + fileName);
-                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "KSS/" + fileName);
+                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/KSS/" + fileName);
 
                             downloadReference = downloadManager.enqueue(request);
                         } else {
@@ -493,7 +494,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
                             if (helpers.directoryExists("SPC/" + fileName)) helpers.deleteDirectory("SPC/" + fileName);
 
-                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "SPC/" + fileName);
+                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/SPC/" + fileName);
                             downloadReference = downloadManager.enqueue(request);
                         } else {
                             Log.d(LOG_TAG, "Toast to report this is not a ViGaMuP file...");
@@ -563,6 +564,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     if (name.contains("vigamup")) { //should be zip..
                         try {
                             unzip(file, targetDirectory);
+                            //Log.d(LOG_TAG, "Unzipped...");
                             boolean deleted = file.delete();
                         } catch (IOException test) {
                             Log.d(LOG_TAG, "Unzip error... very weird");
@@ -593,8 +595,8 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                         request2.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/SPC/" + game + ".png");
                         downloadReference = downloadManager.enqueue(request2);
 
-                        //Thread t = new Thread(new SpcTrackInfoGeneratorThread(game, mPlayerService));
-                        //t.start();
+                        Thread t = new Thread(new SpcTrackInfoGenerator(mPlayerService, game+".rsn", getApplicationContext()));
+                        t.start();
                     }
                 } else {
                     Log.i(LOG_TAG, "Download failed!");
@@ -679,7 +681,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
     private void showMusicList(){
         gameCollection = mPlayerService.gameCollection;
-        gameCollection.createGameCollection(Constants.PLATFORM.MSX);
+        gameCollection.createGameCollection();
         /*FragmentManager fragmentManager = this.getSupportFragmentManager();
         gameList = (GameList) fragmentManager.findFragmentById(R.id.fragment1);
         gameList.updateGameList(gameCollection.getGameObjectsWithTrackInformation());*/
@@ -689,7 +691,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         gamesShowing = true;
     }
 
-    @Override
+    //@Override
     public void gameClicked(int position) {
         if (gameCollection.getGameAtPosition(position).getTitle().equals(gameCollection.getCurrentGame().getTitle())){
             currentShowedGameTitle="";
@@ -701,9 +703,7 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         }
     }
 
-    public void spcClicked() {
-        mPlayerService.playSpc();
-    }
+    //public void spcClicked() {mPlayerService.playSpc();}
 
     public void showGame(boolean setNewKss) {
         Game game = gameCollection.getCurrentGame();
@@ -755,27 +755,50 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
                     //Log.d(LOG_TAG,"setting color on: " + lv.getChildAt(position));
                     //lv.getChildAt(position).setBackgroundColor(Color.GREEN);
                     //lv.setBackgroundColor(Color.WHITE);
+                    Log.d(LOG_TAG, "position: " + position);
                     Game game = gameCollection.getCurrentGame();
-                    if (globalSetNewKss) {
-                        mPlayerService.setKssJava(game.musicFileC);
-                        globalSetNewKss = false;
-                    }
-                    game.setTrack(position-1);
+                    game.setTrack(position - 1);
                     setTrackInfoInPlayerBar();
-
-                    Thread t = new Thread(new Runnable() {
-                        public void run() {
-                            Game game = gameCollection.getCurrentGame();
-                            seekBar.setMax(game.getCurrentTrackLength());
-                            bufferBarProgress = 2; // 2 seconds buffered always in advance...
-                            seekBarThumbProgress = 0;
-                            seekBar.setProgress(0);
-                            mPlayerService.playCurrentTrack();
+                    if (game.getMusicType()==Constants.PLATFORM.MSX) {
+                        if (globalSetNewKss) {
+                            mPlayerService.setKssJava(game.musicFileC);
+                            globalSetNewKss = false;
                         }
-                    });
 
-                    t.start();
-                    try { t.join(); } catch (InterruptedException ie){}
+                        Thread t = new Thread(new Runnable() {
+                            public void run() {
+                                Game game = gameCollection.getCurrentGame();
+                                seekBar.setMax(game.getCurrentTrackLength());
+                                bufferBarProgress = 2; // 2 seconds buffered always in advance...
+                                seekBarThumbProgress = 0;
+                                seekBar.setProgress(0);
+                                mPlayerService.playCurrentTrack();
+                            }
+                        });
+
+                        t.start();
+                        try { t.join(); } catch (InterruptedException ie){}
+
+                    } else {
+                        Thread t = new Thread(new Runnable() {
+                            public void run() {
+                                Game game = gameCollection.getCurrentGame();
+                                seekBar.setMax(game.getCurrentTrackLength());
+                                bufferBarProgress = 2; // 2 seconds buffered always in advance...
+                                seekBarThumbProgress = 0;
+                                seekBar.setProgress(0);
+                                String spcFileName = game.getCurrentTrackFileName();
+                                String rsnFileName = game.musicFileC;
+                                ExtractArchive ea = new ExtractArchive();
+                                ea.extractFileFromArchive(new File(rsnFileName), new File(spcFileName), new File(Constants.vigamupDirectory + "tmp/"));
+                                Log.d(LOG_TAG, "filename: " + spcFileName);
+                                mPlayerService.playSpc(Constants.vigamupDirectory + "tmp/" + spcFileName);
+                            }
+                        });
+
+                        t.start();
+                        try { t.join(); } catch (InterruptedException ie){}
+                    }
 
                     setPlayButtonInPlayerBar();
                 }
@@ -891,10 +914,6 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
         });
     }
 
-    public void test(){
-        Log.d(LOG_TAG,"test...");
-    }
-
     private void setBufferBarProgress(int bufferBarProgress){
         this.bufferBarProgress = bufferBarProgress+2;
         //Log.d(LOG_TAG,"buffer bar should be set to " + bufferBarProgress);
@@ -909,30 +928,33 @@ public class MainActivity extends AppCompatActivity implements GameList.OnGameSe
 
     private class MyPagerAdapter extends FragmentPagerAdapter {
         public Context mContext;
-
+        private ArrayList<Integer> foundMusicTypes;
 
         public MyPagerAdapter(Context c, FragmentManager fm) {
             super(fm);
 
             mContext = c;
+            foundMusicTypes = ((MainActivity)mContext).gameCollection.getFoundMusicTypes();
         }
 
         @Override
         public Fragment getItem(int pos) {
-            MultipleItemsList list;
-            switch (pos) {
+            //MultipleItemsList list;
+            return MultipleItemsList.newInstance(foundMusicTypes.get(pos));
+            /*switch (pos) {
                 case 0:
                     return MultipleItemsList.newInstance(Constants.PLATFORM.MSX);
                 default:
                     return MultipleItemsList.newInstance(Constants.PLATFORM.SNES);
-                /*default:
-                    return MultipleItemsList.newInstance(Constants.PLATFORM.PC_DEMO_SCENE);*/
-            }
+                default:
+                    return MultipleItemsList.newInstance(Constants.PLATFORM.PC_DEMO_SCENE);
+            }*/
         }
 
         @Override
         public int getCount() {
-            return 2;
+            return foundMusicTypes.size();
         }
+
     }
 }

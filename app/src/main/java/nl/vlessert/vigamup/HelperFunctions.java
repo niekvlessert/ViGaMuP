@@ -58,6 +58,10 @@ public class HelperFunctions {
         }
     }
 
+    public void deleteFile(String directory, String file) {
+        new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + directory + "/" + file).delete();
+    }
+
     public void baseMakeDirectory(String directory){
         File folder = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + directory);
         Log.d(LOG_TAG, "create Downloads/"+ directory + "?: " + folder.mkdir());

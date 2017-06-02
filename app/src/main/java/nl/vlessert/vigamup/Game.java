@@ -23,7 +23,9 @@ public class Game {
     public String gameName;
     public String title = null;
     public File imageFile;
-    public String musicType; // KSS for now...
+    public int musicType;
+    private String musicExtension = "";
+    private String musicArchive = "";
     public File musicFile;
     public String musicFileC;
     //private int[] trackList = null;
@@ -46,16 +48,25 @@ public class Game {
 
     private static final int REPEAT_TIMES=2;
 
-    public Game(String gameName, String musicType, Context ctx, int position){
+    public Game(String gameName, int musicType, Context ctx, int position){
         this.ctx = ctx;
         this.gameName = gameName;
         this.musicType = musicType;
-        this.musicFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicType + "/" + gameName + ".kss");
-        this.musicFileC = "/sdcard/Download/ViGaMuP/" + musicType + "/" + gameName + ".kss";
-        this.imageFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicType + "/" + gameName + ".png");
+        if (musicType==Constants.PLATFORM.MSX) {
+            musicExtension="KSS";
+            musicArchive=".kss";
+        }
+        if (musicType==Constants.PLATFORM.SNES) {
+            musicExtension="SPC";
+            musicArchive=".rsn";
+        }
+        this.musicFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + musicArchive);
+        this.musicFileC = "/sdcard/Download/ViGaMuP/" + musicExtension + "/" + gameName + musicArchive;
+        this.imageFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".png");
         this.position = position;
-        readGameInfo(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicType + "/" + gameName + ".gameinfo"));
-        readTrackInformation(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicType + "/" + gameName + ".trackinfo"));
+        //Log.d("vigamup", "musictype: " + musicExtension);
+        readGameInfo(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".gameinfo"));
+        readTrackInformation(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".trackinfo"));
     }
 
     public boolean readTrackInformation(File trackInfoFile){
@@ -65,6 +76,7 @@ public class Game {
         String title = null;
         int partToSkip = 0;
         boolean repeatable = false;
+        String fileName = "";
         String tmp;
         int trackNumber = 1;
         ArrayList<Integer> addedTracks = new ArrayList<>();
@@ -80,18 +92,33 @@ public class Game {
                     if (trackNumber<10) title = "0"+ Integer.toString(trackNumber); else title = Integer.toString(trackNumber);
                     title += " - "+s.next(); //Log.d("KSS","title: " + title); }
                 }
-                if (s.hasNext()) length = Integer.parseInt(s.next()); //Log.d("KSS","length: " + length); }
-                if (s.hasNext()) partToSkip = Integer.parseInt(s.next()); //Log.d("KSS","partToSkip: " + partToSkip); }
                 if (s.hasNext()) {
                     tmp = s.next();
-                    if (tmp.equals("y")) repeatable = true; else repeatable = false;
+                    if (tmp.length()!=0) length = Integer.parseInt(tmp); //Log.d("KSS","length: " + length); }
+                }
+                if (s.hasNext()) {
+                    tmp = s.next();
+                    if (tmp.length()!=0) partToSkip = Integer.parseInt(tmp); //Log.d("KSS","partToSkip: " + partToSkip); }
+                }
+                if (s.hasNext()) {
+                    tmp = s.next();
+                    if (tmp.length()!=0) {
+                        if (tmp.equals("y")) repeatable = true;
+                        else repeatable = false;
+                    }
                     //Log.d("KSS","repeatable: " + repeatable);
+                }
+                if (s.hasNext()) {
+                    tmp = s.next();
+                    if (tmp != null) {
+                        fileName = tmp;
+                    }
                 }
                 line = reader.readLine();
 
                 if (Collections.binarySearch(trackList, track) >=0) {
                     //Log.d("KSS", "adding track: " + track + " " + title + " " + length);
-                    trackInformation.add(new GameTrack(track, title, length, partToSkip, repeatable, trackNumber));
+                    trackInformation.add(new GameTrack(track, title, length, partToSkip, repeatable, trackNumber, fileName));
                     addedTracks.add(track);
                 }
                 trackNumber++;
@@ -111,7 +138,7 @@ public class Game {
                 //Log.d("KSS", "Skipped, so add with defaults: " + trackInt.toString());
                 if (trackNumber<10) title = "0"+ Integer.toString(trackNumber); else title = Integer.toString(trackNumber);
                 title += " - Track " +trackInt.toString(); //Log.d("KSS","title: " + title); }
-                trackInformation.add(new GameTrack(trackInt, title, 120, 0, false, trackNumber));
+                trackInformation.add(new GameTrack(trackInt, title, 120, 0, false, trackNumber, fileName));
                 trackNumber++;
             }
             //Log.d("KSS", )
@@ -123,7 +150,7 @@ public class Game {
                 for (int i =0; i < trackList.size(); i++){
                     if (i+1<10) title = "0"+ Integer.toString(i+1); else title = Integer.toString(i+1);
                     title += " - Track " + trackList.get(i);
-                    trackInformation.add(new GameTrack(trackList.get(i), title, 30, 0, true, i));
+                    trackInformation.add(new GameTrack(trackList.get(i), title, 30, 0, true, i, fileName));
                 }
             }
         }
@@ -249,6 +276,17 @@ public class Game {
         return trackInformation.get(position).getTrackTitle();
     }
 
+    public String getCurrentTrackFileName() { return trackInformation.get(position).getFileName(); }
+
+    public void extractCurrentSpcTrackfromRSN() {
+        String spcFileName = getCurrentTrackFileName();
+        String rsnFileName = musicFileC;
+        ExtractArchive ea = new ExtractArchive();
+        ea.extractFileFromArchive(new File(rsnFileName), new File(spcFileName), new File(Constants.vigamupDirectory + "tmp/"));
+    }
+
+    public String getCurrentTrackFileNameFullPath() { return Constants.vigamupDirectory+"tmp/"+trackInformation.get(position).getFileName(); }
+
     public void setTrack(int position){
         this.position = position;
     }
@@ -297,5 +335,9 @@ public class Game {
         if (vendor.length() > 0) result = vendor;
         if (year.length() > 0 ) result = result.concat(", " + year);
         return result;
+    }
+
+    public Integer getMusicType(){
+        return musicType;
     }
 }

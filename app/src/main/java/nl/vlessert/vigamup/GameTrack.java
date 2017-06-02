@@ -12,14 +12,16 @@ public class GameTrack {
     private int partToSkipWhenUsingRepeat;
     private boolean repeatable;
     private int position;
+    private String fileName;
 
-    public GameTrack(int trackNr, String title, int length, int partToSkipWhenUsingRepeat, boolean repeatable, int position){
+    public GameTrack(int trackNr, String title, int length, int partToSkipWhenUsingRepeat, boolean repeatable, int position, String fileName){
         this.trackNr = trackNr;
         this.title = title;
         this.length = length;
         this.partToSkipWhenUsingRepeat = partToSkipWhenUsingRepeat;
         this.repeatable = repeatable;
         this.position = position;
+        this.fileName = fileName;
     }
 
     public int getPlayTimeWithRepeat(int amountToRepeat) {
@@ -42,4 +44,6 @@ public class GameTrack {
     public int getPosition(){
         return position;
     }
+
+    public String getFileName() { return fileName; }
 }
