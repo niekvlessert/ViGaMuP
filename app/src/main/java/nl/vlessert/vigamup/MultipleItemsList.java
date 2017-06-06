@@ -28,7 +28,7 @@ public class MultipleItemsList extends ListFragment {
         //gameCollection = new GameCollection(getActivity().getApplicationContext(), (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE));
         //gameCollection.createGameCollection(b.getInt("PlatformAndType"));
         //gameCollection.createGameCollection();
-        gameCollection = ((MainActivity)getActivity()).gameCollection;
+        gameCollection = ((MainActivity)getActivity()).getGameCollection();
         GameCollectionShowPerPlatform gc = new GameCollectionShowPerPlatform();
         gc.setAdapterStuff(getActivity().getApplicationContext(), (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE));
         //gameCollection.setAdapterStuff(getActivity().getApplicationContext(), (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE));
@@ -54,6 +54,7 @@ public class MultipleItemsList extends ListFragment {
 
         MultipleItemsList f = new MultipleItemsList();
         Bundle b = new Bundle();
+        //Log.d(LOG_TAG,"platformAndType"+platformAndType);
         b.putInt("PlatformAndType", platformAndType);
         f.setArguments(b);
 

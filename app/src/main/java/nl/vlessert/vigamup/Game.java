@@ -281,6 +281,7 @@ public class Game {
     public void extractCurrentSpcTrackfromRSN() {
         String spcFileName = getCurrentTrackFileName();
         String rsnFileName = musicFileC;
+        Log.d("KSS","Spcfilename: " + spcFileName + ", rsnfilename: " + rsnFileName);
         ExtractArchive ea = new ExtractArchive();
         ea.extractFileFromArchive(new File(rsnFileName), new File(spcFileName), new File(Constants.vigamupDirectory + "tmp/"));
     }

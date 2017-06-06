@@ -53,22 +53,25 @@ public class SpcTrackInfoGenerator implements Runnable{
             File gameinfoFile = new File(Constants.vigamupDirectory+"SPC/"+baseGameName+".gameinfo");
             FileWriter fWriter2 = new FileWriter(gameinfoFile, true);
             String tracks_to_play = "";
+            boolean gameInfoWritten = false;
 
             for (File file: files) {
                 String fileNameNoPath = file.toString().substring(file.toString().lastIndexOf("/") + 1);
                 if (fileNameNoPath.substring(fileNameNoPath.indexOf(".") + 1).equals("spc")) {
                     //Log.d("ViGaMuP SPC generator", "trying: " + fileNameNoPath);
                     spcTrackInfo = mPlayerService.generateSpcTrackInformation(fileNameNoPath);
-                    String[] trackInfoExploded = spcTrackInfo.split(Pattern.quote(";"));
-                    fWriter.write(Integer.toString(trackNr)+","+trackInfoExploded[0].replace(",","")+","+trackInfoExploded[4]+",,,"+fileNameNoPath+"\n");
-                    //fWriter.write(Integer.toString(trackNr)+","+trackInfoExploded[0].replace(",","")+","+trackInfoExploded[4]+"\n");
-                    if (trackNr==1) {
-                        fWriter2.write("title:"+trackInfoExploded[1].replace(",","")+"\n");
-                        fWriter2.write("vendor:"+trackInfoExploded[3]+"\n");
-                        fWriter2.write("composers:"+trackInfoExploded[2].replace(",","")+"\n");
+                    Log.d("ViGaMuP SPC generator", "trying: " + spcTrackInfo);
+                    if (spcTrackInfo.length()>1) {
+                        String[] trackInfoExploded = spcTrackInfo.split(Pattern.quote(";"));
+                        fWriter.write(Integer.toString(trackNr) + "," + trackInfoExploded[0].replace(",", "") + "," + trackInfoExploded[4] + ",,," + fileNameNoPath + "\n");
+                        if (!gameInfoWritten) {
+                            fWriter2.write("title:" + trackInfoExploded[1].replace(",", "") + "\n");
+                            fWriter2.write("vendor:" + trackInfoExploded[3] + "\n");
+                            fWriter2.write("composers:" + trackInfoExploded[2].replace(",", "") + "\n");
+                            gameInfoWritten = true;
+                        }
+                        tracks_to_play+=Integer.toString(trackNr)+",";
                     }
-                    tracks_to_play+=Integer.toString(trackNr)+",";
-
                     trackNr++;
                 }
             }

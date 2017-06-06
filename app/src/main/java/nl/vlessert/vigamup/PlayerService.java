@@ -608,6 +608,8 @@ public class PlayerService extends Service{
 
     private void previousTrack() {
         fixUninitialized();
+        Game game = gameCollection.getCurrentGame();
+
         sendBroadcast(new Intent("resetSeekBar"));
         switch (repeatMode) {
             case Constants.REPEAT_MODES.NORMAL_PLAYBACK:
@@ -617,7 +619,7 @@ public class PlayerService extends Service{
                     currentGame = gameCollection.getCurrentGame();
                     currentGame.setLastTrack();
                     Log.d(LOG_TAG, "Game in service: " + currentGame.title + " " + currentGame.position);
-                    setKssJava(currentGame.musicFileC);
+                    if (game.getMusicType()==0) setKssJava(currentGame.musicFileC);
                 }
                 break;
             case Constants.REPEAT_MODES.LOOP_GAME:
@@ -634,16 +636,28 @@ public class PlayerService extends Service{
                 gameCollection.setCurrentGame(Integer.parseInt(gameAndTrackInfoArray[0]));
                 currentGame = gameCollection.getCurrentGame();
                 currentGame.setTrack(Integer.parseInt(gameAndTrackInfoArray[1]));
-                setKssJava(currentGame.musicFileC);
+                if (game.getMusicType()==0) setKssJava(currentGame.musicFileC);
                 Log.d(LOG_TAG,"gameAndTrackInfo: " + gameAndTrackInfo);
                 break;
         }
         Intent intent = new Intent("setSlidingUpPanelWithGame");
-        setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
-        if (!paused) {
-            alreadyPlaying = true;
-            startKssPlayback();
+
+        switch (game.getMusicType()){
+            case 0:
+                setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
+                if (!paused) {
+                    alreadyPlaying = true;
+                    startKssPlayback();
+                }
+                break;
+            case 1:
+                secondsPlayedFromCurrentTrack = 0;
+                secondsBufferedFromCurrentTrack = 0;
+                currentGame.extractCurrentSpcTrackfromRSN();
+                startSpcPlayback(currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackLength());
+                break;
         }
+
         sendBroadcast(intent);
         updateNotificationTitles();
         updateA2DPInfo();
@@ -949,6 +963,10 @@ public class PlayerService extends Service{
         secondsPlayedFromCurrentTrack = progress;
         updateA2DPPlayState(true);
         setKssProgress(progress);
+    }
+
+    public Game getCurrentGame(){
+        return currentGame;
     }
 
 

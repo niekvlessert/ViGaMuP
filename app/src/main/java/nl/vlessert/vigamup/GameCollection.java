@@ -24,6 +24,7 @@ public class GameCollection{
     private ArrayList<Game> gameObjectsWithTrackInformation;
     private ArrayList<Game> gameObjectsWithoutTrackInformation;
     private Context ctx;
+    private boolean gameCollectionCreated = false;
 
     private List<String> randomizedGameAndTrackList = new ArrayList<>();
     private int randomizedGameAndTrackListPosition = 0;
@@ -55,7 +56,10 @@ public class GameCollection{
                 position++;
             }
         }
-        if (position>0) foundMusicTypes.add(Constants.PLATFORM.MSX);
+        if (position>0) {
+            Log.d(LOG_TAG,"foundMusicTypes.add(Constants.PLATFORM.MSX");
+            foundMusicTypes.add(Constants.PLATFORM.MSX);
+        }
         int storedPosition = position;
         parentDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/SPC/");
         files = parentDir.listFiles();
@@ -66,7 +70,10 @@ public class GameCollection{
                 position++;
             }
         }
-        if (position>storedPosition) foundMusicTypes.add(Constants.PLATFORM.SNES);
+        if (position>storedPosition) {
+            Log.d(LOG_TAG,"foundMusicTypes.add(Constants.PLATFORM.SNES");
+            foundMusicTypes.add(Constants.PLATFORM.SNES);
+        }
 
         gameObjectsWithTrackInformation = new ArrayList<>();
         gameObjectsWithoutTrackInformation = new ArrayList<>();
@@ -93,9 +100,23 @@ public class GameCollection{
         }
         Collections.shuffle(randomizedGameAndTrackList);
 
+        gameCollectionCreated = true;
+
         //Log.d(LOG_TAG,"hmmmm " + gameObjects.size() + " == " + gameObjectsWithTrackInformation.size() + "?");
         /*Log.d(LOG_TAG, "non random: " + Arrays.toString(gameObjectsWithTrackInformation.toArray()));
         Log.d(LOG_TAG, "random: " + Arrays.toString(gameObjectsWithTrackInformationRandomized.toArray()));*/
+    }
+
+    public boolean isGameCollectionCreated(){
+        return gameCollectionCreated;
+    }
+
+    public void deleteGameCollectionObjects() {
+        gameObjects = null;
+        gameObjectsWithoutTrackInformation = null;
+        gameObjectsWithTrackInformation = null;
+        gameCollectionCreated = false;
+        foundMusicTypes = new ArrayList<>();
     }
 
     public void setCurrentGame(int position){

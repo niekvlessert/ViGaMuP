@@ -1,6 +1,7 @@
 package nl.vlessert.vigamup;
 
 import android.Manifest;
+import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
@@ -28,6 +29,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
+import android.support.v4.app.FragmentStatePagerAdapter;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AlertDialog;
@@ -109,7 +111,6 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
     //GameList gameList;
 
     public GameCollection gameCollection;
-    private boolean gameListShowing = false;
 
     private boolean globalSetNewKss = false;
 
@@ -125,6 +126,8 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
     private boolean serviceDestroyed = false;
 
     private HelperFunctions helpers;
+
+    private boolean forceRecreateGameCollection = false;
 
     Window window;
 
@@ -244,10 +247,10 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
         //gameCollection = new GameCollection(this);
         checkForMusicAndInitialize();
-        /*if (checkForMusicAndInitialize()) {
-            gameCollection.createGameCollection();
-            showMusicList(gameList);
-        }*/
+        //if (checkForMusicAndInitialize()) {
+            //if (!gameCollection.isGameCollectionCreated()) gameCollection.createGameCollection();
+            //showMusicList(gameList);
+        //}
 
         filter = new IntentFilter();
         filter.addAction("setBufferBarProgress");
@@ -334,7 +337,9 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     seekBar.setProgress(0);
                     seekBar.setSecondaryProgress(mPlayerService.getBufferBarProgress() + 2);
                     Log.d(LOG_TAG, "Game in onresume: " + game.title + " " + game.position);
-                    if (!game.getTitle().equals(currentShowedGameTitle)) showGame(false);
+                    if (!mPlayerService.getPaused()) {
+                        if (!game.getTitle().equals(currentShowedGameTitle)) showGame(false);
+                    }
                     //LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
                     //ViewGroup.LayoutParams params = ivLayout.getLayoutParams();
                     //ivLayout.setVisibility(LinearLayout.GONE);
@@ -366,6 +371,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
         try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){Log.d(LOG_TAG, "error in destroy: " + iae);}        //Process.killProcess(Process.myPid());
         mServiceConnection = null;
         Log.d(LOG_TAG,"onDestory!!: " + isMyServiceRunning(PlayerService.class));
+        helpers.deleteAllFilesInDirectory("tmp/");
         if (serviceDestroyed) android.os.Process.killProcess(android.os.Process.myPid());
     }
 
@@ -395,14 +401,13 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
             //t.start();
 
             gameCollection = mPlayerService.gameCollection;
-            if (!gameListShowing){
-                mPlayerService.createGameCollection();
-                showMusicList();
+            if (!gamesShowing){
                 Log.d(LOG_TAG, "show music list from onserviceconncet");
-                gameListShowing = true;
+                showMusicList();
             }
             if (!mPlayerService.isPaused()) {
-                Game game = gameCollection.getCurrentGame();
+                //Game game = gameCollection.getCurrentGame();
+                Game game = mPlayerService.getCurrentGame();
                 seekBar.setMax(game.getCurrentTrackLength());
                 bufferBarProgress = 2; // 2 seconds buffered always in advance...
                 seekBarThumbProgress = 0;
@@ -538,7 +543,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
     private void unpackDownloadedFile(Context context, Intent intent){
         Log.d(LOG_TAG,"Download event!!!!");
         String action = intent.getAction();
-        if (DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(action)) {
+        if (DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(action) && downloadReference!=null) {
 
             // get the DownloadManager instance
             DownloadManager manager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
@@ -566,6 +571,11 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                             unzip(file, targetDirectory);
                             //Log.d(LOG_TAG, "Unzipped...");
                             boolean deleted = file.delete();
+                            if (checkForMusicAndInitialize()) {
+                                forceRecreateGameCollection = true;
+                                showMusicList();
+                            }
+                            //recreate();
                         } catch (IOException test) {
                             Log.d(LOG_TAG, "Unzip error... very weird");
                         }
@@ -578,11 +588,11 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                         rebuildMusicList = true;
                         return;
                     }
-                    if (checkForMusicAndInitialize()) {
+                    /*if (checkForMusicAndInitialize()) {
                         mPlayerService.createGameCollection();
                         gamesShowing=false;
                         showMusicList();
-                    }
+                    }*/
                     Toast.makeText(getApplicationContext(), "Download completed...", Toast.LENGTH_LONG).show();
                     if (name.contains("rsn")) { // must be snesmusic.. enqueue image download here... ugly, but don't want to find out multiple downloading as of yet..
                         String game = name.substring(name.lastIndexOf("/")+1, name.lastIndexOf("."));
@@ -597,6 +607,12 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
                         Thread t = new Thread(new SpcTrackInfoGenerator(mPlayerService, game+".rsn", getApplicationContext()));
                         t.start();
+                        try { t.join(); } catch (InterruptedException e) { e.printStackTrace(); }
+                        recreate();
+                        if (checkForMusicAndInitialize()) {
+                            forceRecreateGameCollection = true;
+                            showMusicList();
+                        }
                     }
                 } else {
                     Log.i(LOG_TAG, "Download failed!");
@@ -671,6 +687,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                 helpers.makeDirectory("SPC");
                 helpers.makeDirectory("tmp");
             }
+            //helpers.deleteAllFilesInDirectory("tmp/");
         }
         if (!musicFound) {
             firstRun = true;
@@ -680,13 +697,24 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
     }
 
     private void showMusicList(){
+        Log.d(LOG_TAG,"Show music list...");
         gameCollection = mPlayerService.gameCollection;
-        gameCollection.createGameCollection();
+        if (!gameCollection.isGameCollectionCreated()) {
+            gameCollection.createGameCollection();
+        }
+
+        ViewPager pager = (ViewPager) findViewById(R.id.viewPager);
+
+        if (forceRecreateGameCollection) {
+            Log.d(LOG_TAG, "Force recreate Game Collection...");
+            forceRecreateGameCollection = false;
+            gameCollection.deleteGameCollectionObjects();
+            gameCollection.createGameCollection();
+            pager.getAdapter().notifyDataSetChanged();
+        }
         /*FragmentManager fragmentManager = this.getSupportFragmentManager();
         gameList = (GameList) fragmentManager.findFragmentById(R.id.fragment1);
         gameList.updateGameList(gameCollection.getGameObjectsWithTrackInformation());*/
-        Log.d(LOG_TAG,"Show music list...");
-        ViewPager pager = (ViewPager) findViewById(R.id.viewPager);
         pager.setAdapter(new MyPagerAdapter(this, getSupportFragmentManager()));
         gamesShowing = true;
     }
@@ -926,7 +954,25 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
         seekBar.setProgress(seekBarThumbProgress);
     }
 
-    private class MyPagerAdapter extends FragmentPagerAdapter {
+    public GameCollection getGameCollection() {
+        if (gameCollection != null) return gameCollection;
+        else {
+            if (mServiceBound) {
+                if (mPlayerService.hasGameCollection) {
+                    return mPlayerService.gameCollection;
+                } else {
+                    mPlayerService.createGameCollection();
+                    return mPlayerService.gameCollection;
+                }
+            } else {
+                gameCollection = new GameCollection(this);
+                gameCollection.createGameCollection();
+                return gameCollection;
+            }
+        }
+    }
+
+    private class MyPagerAdapter extends FragmentStatePagerAdapter {
         public Context mContext;
         private ArrayList<Integer> foundMusicTypes;
 
@@ -939,7 +985,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
         @Override
         public Fragment getItem(int pos) {
-            //MultipleItemsList list;
+            //Log.d(LOG_TAG,"Creating newInstance...: "+pos);
             return MultipleItemsList.newInstance(foundMusicTypes.get(pos));
             /*switch (pos) {
                 case 0:
@@ -953,8 +999,13 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
         @Override
         public int getCount() {
+            //Log.d(LOG_TAG, "count in adapter: " + foundMusicTypes.size());
             return foundMusicTypes.size();
         }
 
+        @Override
+        public int getItemPosition(Object object) {
+            return POSITION_NONE;
+        }
     }
 }
