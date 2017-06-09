@@ -281,7 +281,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     setTrackInfoInPlayerBar();
                     setPlayButtonInPlayerBar();
                     initialized = true;
-                    showGame(false);
+                    showGame(false,0);
                 }
                 if (intent.getAction().equals("setPlayButtonInPlayerBar")){
                     setPlayButtonInPlayerBar();
@@ -338,7 +338,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     seekBar.setSecondaryProgress(mPlayerService.getBufferBarProgress() + 2);
                     Log.d(LOG_TAG, "Game in onresume: " + game.title + " " + game.position);
                     if (!mPlayerService.getPaused()) {
-                        if (!game.getTitle().equals(currentShowedGameTitle)) showGame(false);
+                        if (!game.getTitle().equals(currentShowedGameTitle)) showGame(false,0);
                     }
                     //LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
                     //ViewGroup.LayoutParams params = ivLayout.getLayoutParams();
@@ -416,7 +416,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                 initialized = true;
                 setPlayButtonInPlayerBar();
                 setTrackInfoInPlayerBar();
-                showGame(false);
+                showGame(false,0);
             }
         }
     };
@@ -723,18 +723,20 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
     public void gameClicked(int position) {
         if (gameCollection.getGameAtPosition(position).getTitle().equals(gameCollection.getCurrentGame().getTitle())){
             currentShowedGameTitle="";
-            showGame(false);
+            showGame(false,0);
         } else {
             gameCollection.setCurrentGame(position);
             currentShowedGameTitle="";
-            showGame(true);
+            showGame(true, 0);
         }
     }
 
     //public void spcClicked() {mPlayerService.playSpc();}
 
-    public void showGame(boolean setNewKss) {
-        Game game = gameCollection.getCurrentGame();
+    public void showGame(boolean setNewKss, int position) {
+        Game game;
+        if (position!=0) game = gameCollection.getGameAtPosition(position);
+        else game = gameCollection.getCurrentGame();
         Log.d("KSS", "game " + game.getTitle());
         if (!currentShowedGameTitle.equals(game.getTitle())) {
             currentShowedGameTitle = game.getTitle();

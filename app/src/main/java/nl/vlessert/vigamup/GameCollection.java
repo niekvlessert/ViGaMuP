@@ -124,6 +124,7 @@ public class GameCollection{
     }
 
     public Game getCurrentGame(){
+        Log.d(LOG_TAG, "active game: " + activeGame + " title: " + gameObjectsWithTrackInformation.get(activeGame).gameName);
         return gameObjectsWithTrackInformation.get(activeGame);
     }
 
@@ -132,6 +133,10 @@ public class GameCollection{
 
 
     public void setNextGame(){
+        Log.d(LOG_TAG, "active game: "+activeGame);
+        for (Game game: gameObjectsWithTrackInformation){
+            Log.d(LOG_TAG, "Game info: "+ gameObjectsWithTrackInformation.indexOf(game)+ " " + game.gameName);
+        }
         if (activeGame == gameObjectsWithTrackInformation.size()-1) activeGame = 0;
         else activeGame++;
     }

@@ -44,7 +44,7 @@ public class Game {
 
     private ArrayList<GameTrack> trackInformation = new ArrayList<>();
     private ArrayList<GameTrack> randomizedTrackInformation;
-    int randomizedTrackInformationPosition;
+    private int randomizedTrackInformationPosition = 0;
 
     private static final int REPEAT_TIMES=2;
 
@@ -116,8 +116,10 @@ public class Game {
                 }
                 line = reader.readLine();
 
-                if (Collections.binarySearch(trackList, track) >=0) {
-                    //Log.d("KSS", "adding track: " + track + " " + title + " " + length);
+                //if (gameName.equals("kingsvalley2")) Log.d("KSS", "will it add " + title+"??");
+
+                if (trackList.contains(track)) {
+                    //if (gameName.equals("kingsvalley2")) Log.d("KSS", "adding track to " + gameName + ": " + track + " " + title + " " + length);
                     trackInformation.add(new GameTrack(track, title, length, partToSkip, repeatable, trackNumber, fileName));
                     addedTracks.add(track);
                 }
@@ -318,16 +320,13 @@ public class Game {
         return trackInformation;
     }
     public GameTrack getNextRandomTrack(){
-        if (randomizedTrackInformationPosition == randomizedTrackInformation.size()-1) randomizedTrackInformationPosition = 0;
-        else randomizedTrackInformationPosition++;
+        if (++randomizedTrackInformationPosition == randomizedTrackInformation.size()-1) randomizedTrackInformationPosition = 0;
         Log.d("KSS","track nr: " +randomizedTrackInformationPosition);
         return randomizedTrackInformation.get(randomizedTrackInformationPosition);
     }
 
     public GameTrack getPreviousRandomTrack() {
-        if (randomizedTrackInformationPosition == 0)
-            randomizedTrackInformationPosition = randomizedTrackInformation.size() - 1;
-        else randomizedTrackInformationPosition--;
+        if (--randomizedTrackInformationPosition == 0) randomizedTrackInformationPosition = randomizedTrackInformation.size() - 1;
         return randomizedTrackInformation.get(randomizedTrackInformationPosition);
     }
 
