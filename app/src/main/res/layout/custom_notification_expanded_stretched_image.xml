@@ -24,6 +24,7 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:textSize="@dimen/text_size_medium"
+            android:maxLines="1"
             android:textStyle="bold" />
     </LinearLayout>
 

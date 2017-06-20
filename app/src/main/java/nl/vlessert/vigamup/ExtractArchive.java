@@ -69,6 +69,7 @@ public class ExtractArchive {
     public void extractFileFromArchive(File archive, File fileNameToExtract, File destination){
         Archive arch = null;
         OutputStream nullOutputStream = new OutputStream() { @Override public void write(int b) { } };
+        boolean fileFound = false;
 
         try {
             arch = new Archive(archive);
@@ -96,6 +97,8 @@ public class ExtractArchive {
                 //Log.d(LOG_TAG, "fileNameToExtract: "+ fileNameToExtract + ", fileNameString: " + fileNameString);
                 if (fileNameToExtract.toString().equals(fileNameString)) {
                     logInfo("extracting: " + fileNameString);
+                    fileFound = true;
+
                     try {
                         if (fh.isDirectory()) {
                             createDirectory(fh, destination);
@@ -113,12 +116,14 @@ public class ExtractArchive {
                 } else {
                     try {
                         arch.extractFile(fh, nullOutputStream);
+                        //logInfo ("Skipping " + fh.getFileNameString());
                     } catch (RarException e) {
                         logError(e, "error extraction the file");
                     }
                 }
             }
         }
+        if (!fileFound) logInfo("File not found in archive it seems...");
     }
 
     private void logWarn(String warning) {

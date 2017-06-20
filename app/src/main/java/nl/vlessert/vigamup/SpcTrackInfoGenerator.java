@@ -59,7 +59,7 @@ public class SpcTrackInfoGenerator implements Runnable{
                 String fileNameNoPath = file.toString().substring(file.toString().lastIndexOf("/") + 1);
                 if (fileNameNoPath.substring(fileNameNoPath.indexOf(".") + 1).equals("spc")) {
                     //Log.d("ViGaMuP SPC generator", "trying: " + fileNameNoPath);
-                    spcTrackInfo = mPlayerService.generateSpcTrackInformation(fileNameNoPath);
+                    spcTrackInfo = new String(mPlayerService.generateSpcTrackInformation(fileNameNoPath),"UTF8");
                     Log.d("ViGaMuP SPC generator", "trying: " + spcTrackInfo);
                     if (spcTrackInfo.length()>1) {
                         String[] trackInfoExploded = spcTrackInfo.split(Pattern.quote(";"));

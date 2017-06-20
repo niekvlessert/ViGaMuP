@@ -20,7 +20,6 @@ import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
 import android.os.Binder;
 import android.os.Build;
-import android.os.Debug;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.SystemClock;
@@ -216,7 +215,11 @@ public class PlayerService extends Service{
             }
             else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
                 Log.d(LOG_TAG, "Disconnect...");
-                if (!paused) togglePlaybackJava();
+                //if (!paused)  togglePlaybackJava();
+                setPlayingStatePause();
+                pausePlayback();
+                paused = true; // make sure when disconnecting bluetooth with active call, music won't start playing again after hangup of call
+                sendBroadcast(new Intent("setPlayButtonInPlayerBar"));
             }
         }
     };
@@ -271,26 +274,32 @@ public class PlayerService extends Service{
             switch (focusChange) {
                 case AudioManager.AUDIOFOCUS_GAIN:
                     Log.i(LOG_TAG, "AUDIOFOCUS_GAIN");
-                    if (!paused && transientlostbefore) {
-                        togglePlayback();
-                        transientlostbefore = false;
+                    if (!paused) {
+                        //togglePlayback();
+                        //transientlostbefore = false;
+                        //setPlayingStatePlaying();
+                        resumePlayback();
                         setPlayingStatePlaying();
                     }
                     break;
                 case AudioManager.AUDIOFOCUS_LOSS:
                     Log.i(LOG_TAG, "AUDIOFOCUS_LOSS");
                     if (!paused) {
-                        togglePlayback();
+                        //togglePlayback();
                         setPlayingStatePause();
+                        pausePlayback();
+                        sendBroadcast(new Intent("setPlayButtonInPlayerBarForcePause"));
+                        //togglePlaybackJava();
                     }
                     break;
                 case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
                     Log.i(LOG_TAG, "AUDIOFOCUS_LOSS_TRANSIENT");
                     if (!paused) {
-                        togglePlayback();
                         setPlayingStatePause();
+                        pausePlayback();
+                        sendBroadcast(new Intent("setPlayButtonInPlayerBarForcePause"));
                     }
-                    transientlostbefore = true;
+                    //transientlostbefore = true;
                     break;
                 case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
                     Log.i(LOG_TAG, "AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK");
@@ -435,6 +444,8 @@ public class PlayerService extends Service{
                         android.R.drawable.ic_media_pause);
 
                 Log.d(LOG_TAG, "setPlayingStatePlaying");
+                //paused = false;
+                sendBroadcast(new Intent("setPlayButtonInPlayerBar"));
 
                 mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
                 notificationPlaying = true;
@@ -456,6 +467,8 @@ public class PlayerService extends Service{
                 android.R.drawable.ic_media_play);
 
         Log.d(LOG_TAG, "setPlayingStatePause");
+        //paused = true;
+        sendBroadcast(new Intent("setPlayButtonInPlayerBar"));
 
         mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
         notificationPlaying = false;
@@ -540,7 +553,7 @@ public class PlayerService extends Service{
         }
     }
 
-    private void nextTrack() {
+    public void nextTrack() {
         fixUninitialized();
 
         //Log.d(LOG_TAG,"Next track called..." + Debug.getNativeHeapAllocatedSize() + " and " + Debug.getNativeHeapSize());
@@ -562,7 +575,7 @@ public class PlayerService extends Service{
                 break;
             case Constants.REPEAT_MODES.SHUFFLE_IN_GAME:
                 GameTrack gt = currentGame.getNextRandomTrack();
-                Log.d(LOG_TAG,"tracknr. : " + gt.getTrackNr() + "track position " + gt.getPosition());
+                Log.d(LOG_TAG,"tracknr. : " + gt.getTrackNr() + " track position " + gt.getPosition());
                 currentGame.setTrack(gt.getPosition());
                 break;
             case Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM:
@@ -576,8 +589,6 @@ public class PlayerService extends Service{
                 Log.d(LOG_TAG,"gameAndTrackInfo: " + gameAndTrackInfo);
                 break;
         }
-
-        sendBroadcast(new Intent("resetSeekBar"));
 
         Log.d(LOG_TAG, "Randomizer: " + randomizer);
         Log.d(LOG_TAG, "getmusictype: " + currentGame.getMusicType());
@@ -598,15 +609,14 @@ public class PlayerService extends Service{
                 break;
         }
 
-        Intent intent = new Intent("setSlidingUpPanelWithGame");
-        sendBroadcast(intent);
+        sendBroadcast(new Intent("resetSeekBar"));
+        sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
 
         updateNotificationTitles();
-
         updateA2DPInfo();
     }
 
-    private void previousTrack() {
+    public void previousTrack() {
         fixUninitialized();
 
         switch (repeatMode) {
@@ -639,9 +649,6 @@ public class PlayerService extends Service{
                 break;
         }
 
-        Intent intent = new Intent("setSlidingUpPanelWithGame");
-        sendBroadcast(new Intent("resetSeekBar"));
-
         switch (currentGame.getMusicType()){
             case 0:
                 setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
@@ -658,7 +665,9 @@ public class PlayerService extends Service{
                 break;
         }
 
-        sendBroadcast(intent);
+        sendBroadcast(new Intent("resetSeekBar"));
+        sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
+
         updateNotificationTitles();
         updateA2DPInfo();
     }
@@ -705,6 +714,7 @@ public class PlayerService extends Service{
         kssSet = true;
         kssTrackSet = false;
         if (!currentFile.equals(file)) {
+            Log.d(LOG_TAG,"setting new KSS: " + file);
             setKss(file);
             currentFile = file;
         }
@@ -878,6 +888,17 @@ public class PlayerService extends Service{
                         .setState(PlaybackState.STATE_PLAYING, secondsPlayedFromCurrentTrack * 1000, 1.0f, SystemClock.elapsedRealtime())
                         .build();
                 mMediaSession.setPlaybackState(state);
+                if (state.getState()==PlaybackState.STATE_PAUSED) {
+                    // once again, might fix hangup phone and playback won't resume...
+                    state = new PlaybackState.Builder()
+                            .setActions(
+                                    PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PLAY_PAUSE |
+                                            PlaybackState.ACTION_PLAY_FROM_MEDIA_ID | PlaybackState.ACTION_PAUSE |
+                                            PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS)
+                            .setState(PlaybackState.STATE_PLAYING, secondsPlayedFromCurrentTrack * 1000, 1.0f, SystemClock.elapsedRealtime())
+                            .build();
+                    mMediaSession.setPlaybackState(state);
+                }
             } else {
                 PlaybackState state = new PlaybackState.Builder()
                         .setActions(
@@ -966,7 +987,7 @@ public class PlayerService extends Service{
     }
 
     public Game getCurrentGame(){
-        return currentGame;
+        return gameCollection.getCurrentGame();
     }
 
 
@@ -981,11 +1002,13 @@ public class PlayerService extends Service{
     public static native void startKssPlayback();
     public static native void startSpcPlayback(String fileName, int length);
     public static native boolean togglePlayback();
+    public static native void pausePlayback();
+    public static native void resumePlayback();
     public static native boolean toggleLoopTrack();
     public native void setKssProgress(int progress);
     public native void shutdown();
 
     public native void generateTrackInformation();
-    public native String generateSpcTrackInformation(String spcFile);
+    public native byte[] generateSpcTrackInformation(String spcFile);
 
 }

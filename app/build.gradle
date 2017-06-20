@@ -48,5 +48,6 @@ dependencies {
         mavenCentral()
     }
     compile 'com.sothree.slidinguppanel:library:3.3.1'
+    compile 'me.grantland:autofittextview:0.2.+'
     testCompile 'junit:junit:4.12'
 }

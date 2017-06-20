@@ -1,7 +1,6 @@
 package nl.vlessert.vigamup;
 
 import android.Manifest;
-import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
@@ -28,7 +27,6 @@ import android.os.IBinder;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.app.FragmentStatePagerAdapter;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.view.ViewPager;
@@ -112,9 +110,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
     public GameCollection gameCollection;
 
-    private boolean globalSetNewKss = false;
-
-    private ImageButton ib;
+    private ImageButton playButton1, playButton2, prevButton, nextButton, repeatButton;
 
     Long downloadReference;
 
@@ -130,6 +126,8 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
     private boolean forceRecreateGameCollection = false;
 
     Window window;
+
+    int gamePosition = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -198,8 +196,8 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
             }
         });
 
-        ib = (ImageButton)findViewById(R.id.playerTopLayoutPlayButton);
-        ib.setOnClickListener(new View.OnClickListener() {
+        playButton1 = (ImageButton)findViewById(R.id.playerTopLayoutPlayButton);
+        playButton1.setOnClickListener(new View.OnClickListener() {
 
             @Override
             public void onClick(View v) {
@@ -208,6 +206,34 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                 //Log.v(LOG_TAG, "Hmmm.... " + mPlayerService.getPaused());
                 mPlayerService.togglePlaybackJava();
                 setPlayButtonInPlayerBar();
+            }
+        });
+
+        playButton2 = (ImageButton)findViewById(R.id.activity_play);
+        playButton2.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                mPlayerService.togglePlaybackJava();
+                setPlayButtonInPlayerBar();
+            }
+        });
+
+        nextButton = (ImageButton)findViewById(R.id.activity_next);
+        nextButton.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                mPlayerService.nextTrack();
+            }
+        });
+
+        prevButton = (ImageButton)findViewById(R.id.activity_prev);
+        prevButton.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                mPlayerService.previousTrack();
             }
         });
 
@@ -258,6 +284,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
         filter.addAction("resetSeekBar");
         filter.addAction("setSlidingUpPanelWithGame");
         filter.addAction("setPlayButtonInPlayerBar");
+        filter.addAction("setPlayButtonInPlayerBarForcePause");
         filter.addAction("shutdownActivity");
         filter.addAction(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
 
@@ -281,10 +308,13 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     setTrackInfoInPlayerBar();
                     setPlayButtonInPlayerBar();
                     initialized = true;
-                    showGame(false,0);
+                    showGame(-1);
                 }
                 if (intent.getAction().equals("setPlayButtonInPlayerBar")){
                     setPlayButtonInPlayerBar();
+                }
+                if (intent.getAction().equals("setPlayButtonInPlayerBarForcePause")){
+                    setPlayButtonInPlayerBarForcePause();
                 }
                 if (intent.getAction().equals(DownloadManager.ACTION_DOWNLOAD_COMPLETE)){
                     Log.d(LOG_TAG, "Download event!!: " + intent.getAction());
@@ -338,7 +368,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     seekBar.setSecondaryProgress(mPlayerService.getBufferBarProgress() + 2);
                     Log.d(LOG_TAG, "Game in onresume: " + game.title + " " + game.position);
                     if (!mPlayerService.getPaused()) {
-                        if (!game.getTitle().equals(currentShowedGameTitle)) showGame(false,0);
+                        if (!game.getTitle().equals(currentShowedGameTitle)) showGame(-1);
                     }
                     //LinearLayout ivLayout = (LinearLayout) findViewById(R.id.logoLayout);
                     //ViewGroup.LayoutParams params = ivLayout.getLayoutParams();
@@ -416,7 +446,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                 initialized = true;
                 setPlayButtonInPlayerBar();
                 setTrackInfoInPlayerBar();
-                showGame(false,0);
+                showGame(-1);
             }
         }
     };
@@ -536,8 +566,19 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
     }
 
     private void setPlayButtonInPlayerBar(){
-        if (mPlayerService.getPaused()) ib.setImageResource(android.R.drawable.ic_media_play);
-        else ib.setImageResource(android.R.drawable.ic_media_pause);
+        if (mPlayerService.getPaused()) {
+            playButton1.setImageResource(android.R.drawable.ic_media_play);
+            playButton2.setImageResource(android.R.drawable.ic_media_play);
+        }
+        else {
+            playButton1.setImageResource(android.R.drawable.ic_media_pause);
+            playButton2.setImageResource(android.R.drawable.ic_media_pause);
+        }
+    }
+
+    private void setPlayButtonInPlayerBarForcePause(){
+        playButton1.setImageResource(android.R.drawable.ic_media_pause);
+        playButton2.setImageResource(android.R.drawable.ic_media_pause);
     }
 
     private void unpackDownloadedFile(Context context, Intent intent){
@@ -721,21 +762,23 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
     //@Override
     public void gameClicked(int position) {
+        Log.d(LOG_TAG,"Game clicked, position: " + position);
         if (gameCollection.getGameAtPosition(position).getTitle().equals(gameCollection.getCurrentGame().getTitle())){
             currentShowedGameTitle="";
-            showGame(false,0);
+            showGame(-1);
         } else {
-            gameCollection.setCurrentGame(position);
+            //gameCollection.setCurrentGame(position);
             currentShowedGameTitle="";
-            showGame(true, 0);
+            showGame(position);
         }
     }
 
     //public void spcClicked() {mPlayerService.playSpc();}
 
-    public void showGame(boolean setNewKss, int position) {
+    public void showGame(int position) {
         Game game;
-        if (position!=0) game = gameCollection.getGameAtPosition(position);
+        gamePosition = position;
+        if (position!=-1) game = gameCollection.getGameAtPosition(position);
         else game = gameCollection.getCurrentGame();
         Log.d("KSS", "game " + game.getTitle());
         if (!currentShowedGameTitle.equals(game.getTitle())) {
@@ -770,14 +813,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
             lv = (ListView) findViewById(R.id.list);
 
-            if ((setNewKss && mServiceBound) || (!initialized && mServiceBound)) {
-                globalSetNewKss = true;
-                initialized = true;
-            }
-            if (setNewKss && !mServiceBound) {
-                Toast.makeText(this, "Service initiating... try again", Toast.LENGTH_LONG).show();
-                return;
-            }
+            if (mServiceBound) initialized = true;
 
             lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                 @Override
@@ -786,25 +822,28 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     //lv.getChildAt(position).setBackgroundColor(Color.GREEN);
                     //lv.setBackgroundColor(Color.WHITE);
                     Log.d(LOG_TAG, "position: " + position);
-                    Game game = gameCollection.getCurrentGame();
+                    Game game;
+                    if (gamePosition!=-1) game = gameCollection.getGameAtPosition(gamePosition);
+                    else game = gameCollection.getCurrentGame();
                     game.setTrack(position - 1);
-                    setTrackInfoInPlayerBar();
                     if (game.getMusicType()==Constants.PLATFORM.MSX) {
-                        if (globalSetNewKss) {
-                            mPlayerService.setKssJava(game.musicFileC);
-                            globalSetNewKss = false;
-                        }
-
-                        Thread t = new Thread(new Runnable() {
+                        // No idea why it should be done outside the thread... maybe the same problem as the hanging spc audio??
+                        mPlayerService.setKssJava(game.musicFileC);
+                        class PlayKssInThread implements Runnable {
+                            private PlayKssInThread(){}
                             public void run() {
+                                if (gamePosition!=-1) gameCollection.setCurrentGame(gamePosition);
                                 Game game = gameCollection.getCurrentGame();
+                                //mPlayerService.setKssJava(game.musicFileC);
                                 seekBar.setMax(game.getCurrentTrackLength());
                                 bufferBarProgress = 2; // 2 seconds buffered always in advance...
                                 seekBarThumbProgress = 0;
                                 seekBar.setProgress(0);
                                 mPlayerService.playCurrentTrack();
                             }
-                        });
+                        }
+
+                        Thread t = new Thread(new PlayKssInThread());
 
                         t.start();
                         try { t.join(); } catch (InterruptedException ie){}
@@ -812,6 +851,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     } else {
                         Thread t = new Thread(new Runnable() {
                             public void run() {
+                                if (gamePosition!=-1) gameCollection.setCurrentGame(gamePosition);
                                 Game game = gameCollection.getCurrentGame();
                                 seekBar.setMax(game.getCurrentTrackLength());
                                 bufferBarProgress = 2; // 2 seconds buffered always in advance...
@@ -831,6 +871,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     }
 
                     setPlayButtonInPlayerBar();
+                    setTrackInfoInPlayerBar();
                 }
             });
 
@@ -844,7 +885,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
             ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(
                     this,
-                    android.R.layout.simple_list_item_1,
+                    R.layout.tracklist_item_textview,
                     trackArrayList );
 
             if (headerAddedBefore) {
