@@ -23,14 +23,15 @@ public class Game {
     public String gameName;
     public String title = null;
     public File imageFile;
-    public int musicType;
-    private String musicExtension = "";
-    private String musicArchive = "";
+    private int musicType;
+    public String musicExtension = "";
+    public String musicArchive = "";
     public File musicFile;
     public String musicFileC;
     //private int[] trackList = null;
     private ArrayList<Integer> trackList = null;
     public int position = 0;
+    private boolean trackInformationAvailable = true;
 
     private Context ctx;
 
@@ -66,7 +67,9 @@ public class Game {
         this.position = position;
         //Log.d("vigamup", "musictype: " + musicExtension);
         readGameInfo(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".gameinfo"));
-        readTrackInformation(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".trackinfo"));
+        if (!readTrackInformation(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".trackinfo"))){
+            trackInformationAvailable = false;
+        };
     }
 
     public boolean readTrackInformation(File trackInfoFile){
@@ -161,7 +164,7 @@ public class Game {
         return true;
     }
 
-    public boolean readGameInfo(File trackInfoFile){
+    private boolean readGameInfo(File trackInfoFile){
         ArrayList<String> sInfo = new ArrayList<>();
         try {
 
@@ -208,6 +211,10 @@ public class Game {
             return false;
         }
         return true;
+    }
+
+    public boolean hasTrackInformationAvailable() {
+        return trackInformationAvailable;
     }
 
     public boolean hasTrackInformationList(){

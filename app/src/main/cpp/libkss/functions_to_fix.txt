@@ -1,0 +1,17 @@
+OPLL_set_pan
+OPLL_writeReg
+OPLL_dump2patch
+OPLL_patch2dump
+OPLL_calc
+OPLL_calc_stereo
+OPLL_copyPatch
+OPLL_delete
+OPLL_forceRefresh
+OPLL_getDefaultPatch
+OPLL_new
+OPLL_reset
+OPLL_reset_patch
+OPLL_setPatch
+OPLL_set_quality
+OPLL_set_rate
+OPLL_writeIO

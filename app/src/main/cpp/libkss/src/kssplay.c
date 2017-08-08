@@ -259,7 +259,7 @@ void KSSPLAY_set_device_quality(KSSPLAY *kssplay, uint32_t devnum, uint32_t qual
     SCC_set_quality(kssplay->vm->scc, quality);
     break;
   case EDSC_OPLL:
-    OPLL_set_quality(kssplay->vm->opll, quality);
+    kss_OPLL_set_quality(kssplay->vm->opll, quality);
     break;
   default:
     break;
@@ -291,7 +291,7 @@ void KSSPLAY_set_channel_pan(KSSPLAY *kssplay, uint32_t device, uint32_t ch, uin
   switch (device) {
   case EDSC_OPLL:
     if (kssplay->vm->opll) {
-      OPLL_set_pan(kssplay->vm->opll, ch, pan);
+      kss_OPLL_set_pan(kssplay->vm->opll, ch, pan);
     }
     break;
   default:
@@ -437,7 +437,7 @@ static inline void calc_per_ch(KSSPLAY *kssplay, KSSPLAY_PER_CH_OUT *out) {
   }
 
   if (kssplay->kss->fmpac && !kssplay->device_mute[EDSC_OPLL]) {
-    OPLL_calc(kssplay->vm->opll);
+    kss_OPLL_calc(kssplay->vm->opll);
     memcpy(out->opll, kssplay->vm->opll->ch_out, sizeof(out->opll));
   }
 
@@ -494,7 +494,7 @@ static inline void calc_mono(KSSPLAY *kssplay, int16_t *buf, uint32_t length) {
     }
 
     if (kssplay->kss->fmpac && !kssplay->device_mute[EDSC_OPLL]) {
-      d += apply_volume(FIR_calc(kssplay->device_fir[0][EDSC_OPLL], OPLL_calc(kssplay->vm->opll)), volume[EDSC_OPLL]);
+      d += apply_volume(FIR_calc(kssplay->device_fir[0][EDSC_OPLL], kss_OPLL_calc(kssplay->vm->opll)), volume[EDSC_OPLL]);
     }
 
     if (!kssplay->device_mute[EDSC_PSG]) {
@@ -554,11 +554,11 @@ static inline void calc_stereo(KSSPLAY *kssplay, int16_t *buf, uint32_t length) 
 
     if (kssplay->kss->fmpac && !kssplay->device_mute[EDSC_OPLL]) {
       if (kssplay->opll_stereo) {
-        OPLL_calc_stereo(kssplay->vm->opll, b);
+        kss_OPLL_calc_stereo(kssplay->vm->opll, b);
         ch[0] += apply_volume(FIR_calc(kssplay->device_fir[0][EDSC_OPLL], b[0]), volume[EDSC_OPLL][0]);
         ch[1] += apply_volume(FIR_calc(kssplay->device_fir[1][EDSC_OPLL], b[1]), volume[EDSC_OPLL][1]);
       } else {
-        c = FIR_calc(kssplay->device_fir[0][EDSC_OPLL], OPLL_calc(kssplay->vm->opll));
+        c = FIR_calc(kssplay->device_fir[0][EDSC_OPLL], kss_OPLL_calc(kssplay->vm->opll));
         ch[0] += apply_volume(c, volume[EDSC_OPLL][0]);
         ch[1] += apply_volume(c, volume[EDSC_OPLL][1]);
       }
@@ -658,7 +658,7 @@ int KSSPLAY_read_memory(KSSPLAY *kssplay, uint32_t address) { return MMAP_read_m
 
 void KSSPLAY_set_opll_patch(KSSPLAY *kssplay, uint8_t *data) {
   if (kssplay->vm->opll)
-    OPLL_setPatch(kssplay->vm->opll, data);
+    kss_OPLL_setPatch(kssplay->vm->opll, data);
 }
 
 void KSSPLAY_set_channel_mask(KSSPLAY *kssplay, uint32_t device, uint32_t mask) {

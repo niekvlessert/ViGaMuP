@@ -1,5 +1,6 @@
 package nl.vlessert.vigamup;
 
+import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -14,6 +15,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
 import android.media.session.MediaSession;
@@ -25,6 +27,8 @@ import android.os.IBinder;
 import android.os.SystemClock;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.widget.ImageButton;
 import android.widget.RemoteViews;
 
 import java.io.File;
@@ -55,7 +59,7 @@ public class PlayerService extends Service{
 
     RemoteViews views, bigViews;
 
-    int repeatMode = Constants.REPEAT_MODES.NORMAL_PLAYBACK;
+    private int repeatMode = Constants.REPEAT_MODES.NORMAL_PLAYBACK;
 
     private AudioFocusChangeListenerImpl mAudioFocusChangeListener;
     private boolean mFocusGranted, mFocusChanged;
@@ -86,6 +90,10 @@ public class PlayerService extends Service{
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
 
+        /*AlarmManager almgr = (AlarmManager)this.getSystemService(Context.ALARM_SERVICE);
+        Intent timerIntent = new Intent("test");
+        timerIntent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+        PendingIntent pendingOffLoadIntent = PendingIntent.getBroadcast(this, 1, timerIntent, 0);*/
 
         //Log.i(LOG_TAG, "Received Intent " + intent.getAction());
         if (intent==null) {
@@ -154,8 +162,9 @@ public class PlayerService extends Service{
             Log.i(LOG_TAG, "Clicked Play/Pause");
             togglePlaybackJava();
         } else if (intent.getAction().equals(Constants.ACTION.NEXT_ACTION)) {
-            Log.i(LOG_TAG, "Clicked Next");
-            nextTrack();
+            Log.i(LOG_TAG, "Clicked Next/Exit: " + paused);
+            if (paused) sendBroadcast(new Intent("destroyAppAndService"));
+            else nextTrack();
         } else if (intent.getAction().equals(Constants.ACTION.REPEAT_ACTION)) {
             Log.i(LOG_TAG, "Clicked Repeat");
             repeatActivator();
@@ -181,7 +190,7 @@ public class PlayerService extends Service{
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            sendBroadcast(new Intent("shutdownActivity"));
+            sendBroadcast(new Intent("shutdownService!!"));
             Intent stopIntent = new Intent(PlayerService.this, PlayerService.class);
             stopIntent.setAction(Constants.ACTION.STOPFOREGROUND_ACTION);
             stopService(stopIntent);
@@ -309,6 +318,7 @@ public class PlayerService extends Service{
     }
 
     public boolean isPaused(){ return paused; }
+    public int getRepeatMode() { return repeatMode; }
 
     private void createNotification(int bigViewType){
         currentBigViewType = bigViewType;
@@ -324,6 +334,7 @@ public class PlayerService extends Service{
         notificationIntent.setAction(Constants.ACTION.MAIN_ACTION);
 
         views = new RemoteViews(getPackageName(), R.layout.custom_notification);
+
         if (bigViewType == Constants.BIG_VIEW_TYPES.STRETCHED) {
             bigViews = new RemoteViews(getPackageName(), R.layout.custom_notification_expanded_stretched_image);
         } else {
@@ -362,6 +373,10 @@ public class PlayerService extends Service{
         repeatIntent.setAction(Constants.ACTION.REPEAT_ACTION);
         prepeatIntent = PendingIntent.getService(this, 0,
                 repeatIntent, 0);
+
+        //LayoutInflater inflater = (LayoutInflater) getSystemService(LAYOUT_INFLATER_SERVICE);
+        //ImageButton ib = inflater.inflate(R.id.status_bar_play, null));
+
 
         views.setOnClickPendingIntent(R.id.status_bar_play, pplayIntent);
         bigViews.setOnClickPendingIntent(R.id.status_bar_play, pplayIntent);
@@ -443,6 +458,11 @@ public class PlayerService extends Service{
                 bigViews.setImageViewResource(R.id.status_bar_play,
                         android.R.drawable.ic_media_pause);
 
+                views.setImageViewResource(R.id.status_bar_next,
+                        android.R.drawable.ic_media_next);
+                bigViews.setImageViewResource(R.id.status_bar_next,
+                        android.R.drawable.ic_media_next);
+
                 Log.d(LOG_TAG, "setPlayingStatePlaying");
                 //paused = false;
                 sendBroadcast(new Intent("setPlayButtonInPlayerBar"));
@@ -465,6 +485,11 @@ public class PlayerService extends Service{
                 android.R.drawable.ic_media_play);
         bigViews.setImageViewResource(R.id.status_bar_play,
                 android.R.drawable.ic_media_play);
+
+        views.setImageViewResource(R.id.status_bar_next,
+                android.R.drawable.ic_menu_close_clear_cancel);
+        bigViews.setImageViewResource(R.id.status_bar_next,
+                android.R.drawable.ic_menu_close_clear_cancel);
 
         Log.d(LOG_TAG, "setPlayingStatePause");
         //paused = true;
@@ -794,12 +819,12 @@ public class PlayerService extends Service{
         updateA2DPInfo();
         if (!paused) sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
         sendBroadcast(new Intent("setPlayButtonInPlayerBar"));
-        if (paused) this.stopForeground(false);
+        /*if (paused) this.stopForeground(false);
             else startForeground(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE,
-                notification);
+                notification);*/
     }
 
-    private void repeatActivator(){
+    public void repeatActivator(){
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         Game game = gameCollection.getCurrentGame();
         Handler handler = new Handler();
@@ -809,6 +834,7 @@ public class PlayerService extends Service{
                 bigViews.setImageViewResource(R.id.status_bar_repeat,
                         R.drawable.img_btn_repeat_pressed);
                 bigViews.setTextViewText(R.id.status_bar_track_name,"Repeat 1: loop current track (if supported, from next track)");
+                sendBroadcast(new Intent("updateRepeatButton"));
                 repeatMode = Constants.REPEAT_MODES.LOOP_TRACK;
                 mNotificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, notification);
                 toggleLoopTrack();
@@ -823,6 +849,7 @@ public class PlayerService extends Service{
                 break;
             case Constants.REPEAT_MODES.LOOP_GAME :
                 randomizer = true;
+                sendBroadcast(new Intent("updateRepeatButton"));
                 repeatMode = Constants.REPEAT_MODES.SHUFFLE_IN_GAME;
                 bigViews.setImageViewResource(R.id.status_bar_repeat,
                         R.drawable.img_btn_shuffle_pressed);
@@ -838,6 +865,7 @@ public class PlayerService extends Service{
                 break;
             case Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM :
                 randomizer = false;
+                sendBroadcast(new Intent("updateRepeatButton"));
                 repeatMode = Constants.REPEAT_MODES.NORMAL_PLAYBACK;
                 bigViews.setImageViewResource(R.id.status_bar_repeat,
                         R.drawable.img_btn_repeat);

@@ -70,6 +70,7 @@
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:textSize="@dimen/text_size_medium"
+            android:textColor="@color/white"
             android:maxLines="1"
             android:textStyle="bold" />
         <LinearLayout
@@ -84,6 +85,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight=".50"
+                android:textColor="@color/white"
                 android:maxLines="1"
                 />
             <TextView
@@ -94,6 +96,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight=".50"
+                android:textColor="@color/white"
                 android:maxLines="1"
                 />
         </LinearLayout>

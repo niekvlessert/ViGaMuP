@@ -11,9 +11,12 @@
 // for native audio
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
+#include <malloc.h>
+
 
 #include "libkss/src/kssplay.h"
 #include "game-music-emu-0.6.0/gme/gme.h"
+#include "vgmplay/src/VGMPlay_Intf.h"
 
 // engine interfaces
 static SLObjectItf engineObject = NULL;
@@ -157,7 +160,7 @@ int queueSecondIfRequired(void *context){
                 }
                 __android_log_print(ANDROID_LOG_INFO, "KSS", "memory info at secondsplayed %d, position %d: sum %d", secondsPlayed, j, sum);
             }*/
-            __android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
+            //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
             memcpy(queueBuffer1, &fullTrackWavebuf[secondsPlayed * deviceSampleRate * 2], deviceSampleRate*4);
             memcpy(queueBufferSilence, (int8_t *) &fullTrackWavebuf[secondsPlayed * deviceSampleRate], deviceSampleRate);
             queueSecond = 0;
@@ -512,6 +515,12 @@ void Java_nl_vlessert_vigamup_PlayerService_startSpcPlayback(JNIEnv* env, jclass
 
     isPlaying = 1;
 }
+
+void Java_nl_vlessert_vigamup_PlayerService_startVgmPlayback(JNIEnv* env, jclass clazz, char *file, int secondsToPlay) {
+    const char *utf8File = (*env)->GetStringUTFChars(env, file, NULL);
+    //VGMPlay_Init();
+}
+
 
 // create the engine and output mix objects
 void Java_nl_vlessert_vigamup_PlayerService_createEngine(JNIEnv* env, jobject instance)

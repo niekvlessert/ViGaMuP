@@ -119,7 +119,7 @@ static void iowrite(VM *vm, uint32_t a, uint32_t d) {
   case 0xF0:
   case 0xF1:
     if (vm->opll) {
-      OPLL_writeIO(vm->opll, a, d);
+      kss_OPLL_writeIO(vm->opll, a, d);
       LPDETECT_write(vm->lpde, a, d);
     }
     break;
@@ -191,7 +191,7 @@ VM *VM_new(int rate) {
   vm->sng = SNG_new(MSX_CLK, rate);
   vm->psg = PSG_new(MSX_CLK, rate);
   vm->scc = SCC_new(MSX_CLK, rate);
-  vm->opll = OPLL_new(MSX_CLK, rate);
+  vm->opll = kss_OPLL_new(MSX_CLK, rate);
   vm->opl = OPL_new(MSX_CLK, rate);
   vm->mmap = MMAP_new();
   vm->lpde = LPDETECT_new();
@@ -213,7 +213,7 @@ void VM_delete(VM *vm) {
   SNG_delete(vm->sng);
   PSG_delete(vm->psg);
   SCC_delete(vm->scc);
-  OPLL_delete(vm->opll);
+  kss_OPLL_delete(vm->opll);
   OPL_delete(vm->opl);
   kmevent_free(&vm->kme, vm->vsync_id);
   free(vm);
@@ -239,7 +239,7 @@ void VM_reset_device(VM *vm) {
   VM_set_PSG_type(vm, vm->psg_type);
   SCC_reset(vm->scc);
   VM_set_SCC_type(vm, vm->scc_type);
-  OPLL_reset(vm->opll);
+  kss_OPLL_reset(vm->opll);
   VM_set_OPLL_type(vm, vm->opll_type);
   OPL_reset(vm->opl);
   VM_set_OPL_type(vm, vm->opl_type);
@@ -282,11 +282,11 @@ void VM_set_OPLL_type(VM *vm, uint32_t opll_type) {
     return;
 
   if (opll_type == VM_OPLL_2413)
-    OPLL_reset_patch(vm->opll, OPLL_2413_TONE);
+    kss_OPLL_reset_patch(vm->opll, OPLL_2413_TONE);
   else if (opll_type == VM_OPLL_VRC7)
-    OPLL_reset_patch(vm->opll, OPLL_VRC7_TONE);
+    kss_OPLL_reset_patch(vm->opll, OPLL_VRC7_TONE);
   else if (opll_type == VM_OPLL_281B)
-    OPLL_reset_patch(vm->opll, OPLL_281B_TONE);
+    kss_OPLL_reset_patch(vm->opll, OPLL_281B_TONE);
   else
     ;
   vm->opll_type = opll_type;

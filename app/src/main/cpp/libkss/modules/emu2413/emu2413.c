@@ -22,10 +22,10 @@
                                Change the default table size.
                                Clock and Rate can be changed during play.
   2001 06-24 : Version 0.50 -- Improved the hi-hat and the cymbal tone.
-                               Added VRC7 patch (OPLL_reset_patch is changed).
-                               Fixed OPLL_reset() bug.
+                               Added VRC7 patch (kss_OPLL_reset_patch is changed).
+                               Fixed kss_OPLL_reset() bug.
                                Added OPLL_setMask, OPLL_getMask and OPLL_toggleMask.
-                               Added OPLL_writeIO.
+                               Added kss_OPLL_writeIO.
   2001 09-28 : Version 0.51 -- Removed the noise table.
   2002 01-28 : Version 0.52 -- Added Stereo mode.
   2002 02-07 : Version 0.53 -- Fixed some drum bugs.
@@ -425,7 +425,7 @@ makeRksTable (void)
 }
 
 void
-OPLL_dump2patch (const uint8_t * dump, OPLL_PATCH * patch)
+kss_OPLL_dump2patch (const uint8_t * dump, OPLL_PATCH * patch)
 {
   patch[0].AM = (dump[0] >> 7) & 1;
   patch[1].AM = (dump[1] >> 7) & 1;
@@ -454,9 +454,9 @@ OPLL_dump2patch (const uint8_t * dump, OPLL_PATCH * patch)
 }
 
 void
-OPLL_getDefaultPatch (int32_t type, int32_t num, OPLL_PATCH * patch)
+kss_OPLL_getDefaultPatch (int32_t type, int32_t num, OPLL_PATCH * patch)
 {
-  OPLL_dump2patch (default_inst[type] + num * 16, patch);
+  kss_OPLL_dump2patch (default_inst[type] + num * 16, patch);
 }
 
 static void
@@ -466,26 +466,26 @@ makeDefaultPatch ()
 
   for (i = 0; i < OPLL_TONE_NUM; i++)
     for (j = 0; j < 19; j++)
-      OPLL_getDefaultPatch (i, j, &default_patch[i][j * 2]);
+      kss_OPLL_getDefaultPatch (i, j, &default_patch[i][j * 2]);
 
 }
 
 void
-OPLL_setPatch (OPLL * opll, const uint8_t * dump)
+kss_OPLL_setPatch (OPLL * opll, const uint8_t * dump)
 {
   OPLL_PATCH patch[2];
   int i;
 
   for (i = 0; i < 19; i++)
   {
-    OPLL_dump2patch (dump + i * 16, patch);
+    kss_OPLL_dump2patch (dump + i * 16, patch);
     memcpy (&opll->patch[i*2+0], &patch[0], sizeof (OPLL_PATCH));
     memcpy (&opll->patch[i*2+1], &patch[1], sizeof (OPLL_PATCH));
   }
 }
 
 void
-OPLL_patch2dump (const OPLL_PATCH * patch, uint8_t * dump)
+kss_OPLL_patch2dump (const OPLL_PATCH * patch, uint8_t * dump)
 {
   dump[0] = (uint8_t) ((patch[0].AM << 7) + (patch[0].PM << 6) + (patch[0].EG << 5) + (patch[0].KR << 4) + patch[0].ML);
   dump[1] = (uint8_t) ((patch[1].AM << 7) + (patch[1].PM << 6) + (patch[1].EG << 5) + (patch[1].KR << 4) + patch[1].ML);
@@ -831,7 +831,7 @@ update_key_status (OPLL * opll)
 }
 
 void
-OPLL_copyPatch (OPLL * opll, int32_t num, OPLL_PATCH * patch)
+kss_OPLL_copyPatch (OPLL * opll, int32_t num, OPLL_PATCH * patch)
 {
   memcpy (&opll->patch[num], patch, sizeof (OPLL_PATCH));
 }
@@ -900,7 +900,7 @@ maketables (uint32_t c, uint32_t r)
 }
 
 OPLL *
-OPLL_new (uint32_t clk, uint32_t rate)
+kss_OPLL_new (uint32_t clk, uint32_t rate)
 {
   OPLL *opll;
   int32_t i;
@@ -916,15 +916,15 @@ OPLL_new (uint32_t clk, uint32_t rate)
 
   opll->mask = 0;
 
-  OPLL_reset (opll);
-  OPLL_reset_patch (opll, 0);
+  kss_OPLL_reset (opll);
+  kss_OPLL_reset_patch (opll, 0);
 
   return opll;
 }
 
 
 void
-OPLL_delete (OPLL * opll)
+kss_OPLL_delete (OPLL * opll)
 {
   free (opll);
 }
@@ -932,17 +932,17 @@ OPLL_delete (OPLL * opll)
 
 /* Reset patch datas by system default. */
 void
-OPLL_reset_patch (OPLL * opll, int32_t type)
+kss_OPLL_reset_patch (OPLL * opll, int32_t type)
 {
   int32_t i;
 
   for (i = 0; i < 19 * 2; i++)
-    OPLL_copyPatch (opll, i, &default_patch[type % OPLL_TONE_NUM][i]);
+    kss_OPLL_copyPatch (opll, i, &default_patch[type % OPLL_TONE_NUM][i]);
 }
 
 /* Reset whole of OPLL except patch datas. */
 void
-OPLL_reset (OPLL * opll)
+kss_OPLL_reset (OPLL * opll)
 {
   int32_t i;
 
@@ -968,7 +968,7 @@ OPLL_reset (OPLL * opll)
   }
 
   for (i = 0; i < 0x40; i++)
-    OPLL_writeReg (opll, i, 0);
+    kss_OPLL_writeReg (opll, i, 0);
 
   opll->realstep = (uint32_t) ((1 << 31) / rate);
   opll->opllstep = (uint32_t) ((1 << 31) / (clk / 72));
@@ -980,7 +980,7 @@ OPLL_reset (OPLL * opll)
 
 /* Force Refresh (When external program changes some parameters). */
 void
-OPLL_forceRefresh (OPLL * opll)
+kss_OPLL_forceRefresh (OPLL * opll)
 {
   int32_t i;
 
@@ -1001,7 +1001,7 @@ OPLL_forceRefresh (OPLL * opll)
 }
 
 void
-OPLL_set_rate (OPLL * opll, uint32_t r)
+kss_OPLL_set_rate (OPLL * opll, uint32_t r)
 {
   if (opll->quality)
     rate = 49716;
@@ -1012,10 +1012,10 @@ OPLL_set_rate (OPLL * opll, uint32_t r)
 }
 
 void
-OPLL_set_quality (OPLL * opll, uint32_t q)
+kss_OPLL_set_quality (OPLL * opll, uint32_t q)
 {
   opll->quality = q;
-  OPLL_set_rate (opll, rate);
+  kss_OPLL_set_rate (opll, rate);
 }
 
 /*********************************************************
@@ -1383,7 +1383,7 @@ mix_output(OPLL *opll) {
 }
 
 int16_t
-OPLL_calc (OPLL * opll)
+kss_OPLL_calc (OPLL * opll)
 {
   if (!opll->quality)
   {
@@ -1415,7 +1415,7 @@ mix_output_stereo(OPLL *opll, int32_t out[2]) {
 }
 
 void
-OPLL_calc_stereo (OPLL * opll, int32_t out[2])
+kss_OPLL_calc_stereo (OPLL * opll, int32_t out[2])
 {
   if (!opll->quality)
   {
@@ -1471,7 +1471,7 @@ OPLL_toggleMask (OPLL * opll, uint32_t mask)
 *****************************************************/
 
 void
-OPLL_writeReg (OPLL * opll, uint32_t reg, uint32_t data)
+kss_OPLL_writeReg (OPLL * opll, uint32_t reg, uint32_t data)
 {
   int32_t i, v, ch;
 
@@ -1708,17 +1708,17 @@ OPLL_writeReg (OPLL * opll, uint32_t reg, uint32_t data)
 }
 
 void
-OPLL_writeIO (OPLL * opll, uint32_t adr, uint32_t val)
+kss_OPLL_writeIO (OPLL * opll, uint32_t adr, uint32_t val)
 {
   if (adr & 1)
-    OPLL_writeReg (opll, opll->adr, val);
+    kss_OPLL_writeReg (opll, opll->adr, val);
   else
     opll->adr = val;
 }
 
 /* STEREO MODE (OPT) */
 void
-OPLL_set_pan (OPLL * opll, uint32_t ch, uint32_t pan)
+kss_OPLL_set_pan (OPLL * opll, uint32_t ch, uint32_t pan)
 {
   opll->pan[ch & 15] = pan & 3;
 }

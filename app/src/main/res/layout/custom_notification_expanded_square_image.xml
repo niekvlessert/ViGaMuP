@@ -85,6 +85,7 @@
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:textSize="@dimen/text_size_medium"
+            android:textColor="@color/white"
             android:maxLines="1"
             android:textStyle="bold" />
         <TextView
@@ -95,6 +96,7 @@
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:maxLines="1"
+            android:textColor="@color/white"
             />
         <TextView
             android:ellipsize="marquee"
@@ -104,6 +106,7 @@
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:maxLines="1"
+            android:textColor="@color/white"
             />
     </LinearLayout>
 </RelativeLayout>

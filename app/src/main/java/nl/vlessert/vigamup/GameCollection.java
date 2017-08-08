@@ -49,11 +49,13 @@ public class GameCollection{
         File[] files = parentDir.listFiles();
         String[] strings;
         int position = 0;
-        for (File file : files) {
-            if(file.getName().endsWith(".kss")){
-                strings = file.getName().split("\\.");
-                gameObjects.add(new Game(strings[0], Constants.PLATFORM.MSX, ctx, position));
-                position++;
+        if (files != null) {
+            for (File file : files) {
+                if (file.getName().endsWith(".kss")) {
+                    strings = file.getName().split("\\.");
+                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.MSX, ctx, position));
+                    position++;
+                }
             }
         }
         if (position>0) {
@@ -63,11 +65,13 @@ public class GameCollection{
         int storedPosition = position;
         parentDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/SPC/");
         files = parentDir.listFiles();
-        for (File file : files) {
-            if(file.getName().endsWith(".rsn")){
-                strings = file.getName().split("\\.");
-                gameObjects.add(new Game(strings[0], Constants.PLATFORM.SNES, ctx, position));
-                position++;
+        if (files!=null) {
+            for (File file : files) {
+                if (file.getName().endsWith(".rsn")) {
+                    strings = file.getName().split("\\.");
+                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.SNES, ctx, position));
+                    position++;
+                }
             }
         }
         if (position>storedPosition) {

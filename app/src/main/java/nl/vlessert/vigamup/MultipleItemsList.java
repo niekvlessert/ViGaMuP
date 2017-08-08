@@ -10,6 +10,7 @@ import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 
@@ -42,7 +43,11 @@ public class MultipleItemsList extends ListFragment {
     @Override
     public void onListItemClick(ListView l, View v, int position, long id) {
         Game game = ((Game)getListAdapter().getItem(position));
-        ((MainActivity)getActivity()).gameClicked(gameCollection.getGameObjectsWithTrackInformation().indexOf(game));
+        if (game.hasTrackInformationAvailable()) {
+            ((MainActivity) getActivity()).gameClicked(gameCollection.getGameObjectsWithTrackInformation().indexOf(game));
+        } else {
+            Toast.makeText((getActivity()), "This game has no track information... please add it, look at vigamup.tk for more information.", Toast.LENGTH_LONG).show();
+        }
     }
 
     public static class ViewHolder {
@@ -135,7 +140,7 @@ public class MultipleItemsList extends ListFragment {
 
             switch (type) {
                 case NO_TRACK_INFORMATION:
-                    holder.textView2.setText("No track information, click to let ViGaMup generate it...");
+                    holder.textView2.setText("No track information, FFT to do it automagically is coming (I hope)...");
 
                     break;
                 case TRACK_INFORMATION:

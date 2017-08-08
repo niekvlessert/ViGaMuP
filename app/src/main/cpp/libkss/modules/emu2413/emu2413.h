@@ -103,32 +103,32 @@ typedef struct __OPLL {
 } OPLL ;
 
 /* Create Object */
-OPLL *OPLL_new(uint32_t clk, uint32_t rate) ;
-void OPLL_delete(OPLL *) ;
+OPLL *kss_OPLL_new(uint32_t clk, uint32_t rate) ;
+void kss_OPLL_delete(OPLL *) ;
 
 /* Setup */
-void OPLL_reset(OPLL *) ;
-void OPLL_reset_patch(OPLL *, int32_t) ;
-void OPLL_set_rate(OPLL *opll, uint32_t r) ;
-void OPLL_set_quality(OPLL *opll, uint32_t q) ;
-void OPLL_set_pan(OPLL *, uint32_t ch, uint32_t pan);
+void kss_OPLL_reset(OPLL *) ;
+void kss_OPLL_reset_patch(OPLL *, int32_t) ;
+void kss_OPLL_set_rate(OPLL *opll, uint32_t r) ;
+void kss_OPLL_set_quality(OPLL *opll, uint32_t q) ;
+void kss_OPLL_set_pan(OPLL *, uint32_t ch, uint32_t pan);
 
 /* Port/Register access */
-void OPLL_writeIO(OPLL *, uint32_t reg, uint32_t val) ;
-void OPLL_writeReg(OPLL *, uint32_t reg, uint32_t val) ;
+void kss_OPLL_writeIO(OPLL *, uint32_t reg, uint32_t val) ;
+void kss_OPLL_writeReg(OPLL *, uint32_t reg, uint32_t val) ;
 
 /* Synthsize */
-int16_t OPLL_calc(OPLL *) ;
-void OPLL_calc_stereo(OPLL *, int32_t out[2]) ;
+int16_t kss_OPLL_calc(OPLL *) ;
+void kss_OPLL_calc_stereo(OPLL *, int32_t out[2]) ;
 
 /* Misc */
-void OPLL_setPatch(OPLL *, const uint8_t *dump) ;
-void OPLL_copyPatch(OPLL *, int32_t, OPLL_PATCH *) ;
-void OPLL_forceRefresh(OPLL *) ;
+void kss_OPLL_setPatch(OPLL *, const uint8_t *dump) ;
+void kss_OPLL_copyPatch(OPLL *, int32_t, OPLL_PATCH *) ;
+void kss_OPLL_forceRefresh(OPLL *) ;
 /* Utility */
-void OPLL_dump2patch(const uint8_t *dump, OPLL_PATCH *patch) ;
-void OPLL_patch2dump(const OPLL_PATCH *patch, uint8_t *dump) ;
-void OPLL_getDefaultPatch(int32_t type, int32_t num, OPLL_PATCH *) ;
+void kss_OPLL_dump2patch(const uint8_t *dump, OPLL_PATCH *patch) ;
+void kss_OPLL_patch2dump(const OPLL_PATCH *patch, uint8_t *dump) ;
+void kss_OPLL_getDefaultPatch(int32_t type, int32_t num, OPLL_PATCH *) ;
 
 /* Channel Mask */
 uint32_t OPLL_setMask(OPLL *, uint32_t mask) ;

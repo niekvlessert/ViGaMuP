@@ -237,6 +237,15 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
             }
         });
 
+        repeatButton = (ImageButton)findViewById(R.id.activity_repeat);
+        repeatButton.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                setRepeatMode(true);
+            }
+        });
+
         //gameLogoView = (ImageView) findViewById(R.id.logo);
 
         logoLayout2 = (LinearLayout) findViewById(R.id.logoLayout2);
@@ -286,6 +295,8 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
         filter.addAction("setPlayButtonInPlayerBar");
         filter.addAction("setPlayButtonInPlayerBarForcePause");
         filter.addAction("shutdownActivity");
+        filter.addAction("updateRepeatButton");
+        filter.addAction("destroyAppAndService");
         filter.addAction(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
 
         receiver = new BroadcastReceiver() {
@@ -320,6 +331,9 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     Log.d(LOG_TAG, "Download event!!: " + intent.getAction());
                     unpackDownloadedFile(context, intent);
                 }
+                if (intent.getAction().equals("destroyAppAndService")){
+                    destroyAppAndService();
+                }
                 if (intent.getAction().equals("shutdownActivity")) {
                     serviceDestroyed = true;
                     try {
@@ -331,6 +345,9 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     } catch (IllegalArgumentException iae) {
                     }
                     finish();
+                }
+                if (intent.getAction().equals("updateRepeatButton")) {
+                    setRepeatMode(false);
                 }
             }
         };
@@ -348,7 +365,9 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
         Log.d(LOG_TAG,"onResume!!");
         registerReceiver(receiver, filter);
         if (!firstRun) {
+            Log.d(LOG_TAG,"na !firstrun");
             if (checkForMusicAndInitialize()) {
+                Log.d(LOG_TAG,"na checkForMusicAndInitialize" + mServiceBound);
                 if (mServiceBound) {
                     if (rebuildMusicList) {
                         rebuildMusicList = false;
@@ -360,6 +379,11 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
                     setTrackInfoInPlayerBar();
                     setPlayButtonInPlayerBar();
+
+                    int repeatMode = mPlayerService.getRepeatMode();
+                    Log.d(LOG_TAG, "repeatmode in onresume: "+ repeatMode);
+                    if (repeatMode == Constants.REPEAT_MODES.LOOP_GAME || repeatMode == Constants.REPEAT_MODES.LOOP_TRACK) repeatButton.setImageResource(R.drawable.img_btn_repeat_pressed);
+                    if (repeatMode == Constants.REPEAT_MODES.SHUFFLE_IN_GAME || repeatMode == Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM) repeatButton.setImageResource(R.drawable.img_btn_shuffle_pressed);
 
                     seekBar.setMax(game.getCurrentTrackLength());
                     bufferBarProgress = 2; // 2 seconds buffered always in advance...
@@ -400,7 +424,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
         try { unregisterReceiver(receiver); } catch (IllegalArgumentException iae){ Log.d(LOG_TAG, "error in destroy: " + iae);}
         try { unbindService(mServiceConnection); } catch (IllegalArgumentException iae){Log.d(LOG_TAG, "error in destroy: " + iae);}        //Process.killProcess(Process.myPid());
         mServiceConnection = null;
-        Log.d(LOG_TAG,"onDestory!!: " + isMyServiceRunning(PlayerService.class));
+        Log.d(LOG_TAG,"onDestroy!! isservicerunning: " + isMyServiceRunning(PlayerService.class) + ", destroy service?: " + serviceDestroyed);
         helpers.deleteAllFilesInDirectory("tmp/");
         if (serviceDestroyed) android.os.Process.killProcess(android.os.Process.myPid());
     }
@@ -417,6 +441,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
+            Log.d(LOG_TAG,"service disconnected!!");
             mServiceBound = false;
         }
 
@@ -436,6 +461,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                 showMusicList();
             }
             if (!mPlayerService.isPaused()) {
+                Log.d(LOG_TAG,"playing from onserviceconnected and service not paused!!");
                 //Game game = gameCollection.getCurrentGame();
                 Game game = mPlayerService.getCurrentGame();
                 seekBar.setMax(game.getCurrentTrackLength());
@@ -446,6 +472,9 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                 initialized = true;
                 setPlayButtonInPlayerBar();
                 setTrackInfoInPlayerBar();
+                int repeatMode = mPlayerService.getRepeatMode();
+                if (repeatMode == Constants.REPEAT_MODES.LOOP_GAME || repeatMode == Constants.REPEAT_MODES.LOOP_TRACK) repeatButton.setImageResource(R.drawable.img_btn_repeat_pressed);
+                if (repeatMode == Constants.REPEAT_MODES.SHUFFLE_IN_GAME || repeatMode == Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM) repeatButton.setImageResource(R.drawable.img_btn_shuffle_pressed);
                 showGame(-1);
             }
         }
@@ -461,26 +490,40 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.action_settings:
+            //case R.id.action_settings:
                 //Toast.makeText(getApplicationContext(), "Item 1 Selected", Toast.LENGTH_LONG).show();
-                return true;
+                //return true;
             case R.id.download_music:
                 downloadMusic();
                 return true;
             case R.id.about:
+                AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                builder.setMessage("ViGaMuP by Niek Vlessert. Many thanks to Okaxaki and Blargg for their amazing libraries, to the msx.org community for giving me tips and info and to snesmusic.org for their great collection.")
+                        .setCancelable(false)
+                        .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int id) {
+                            }
+                        });
+                AlertDialog alert = builder.create();
+
+                alert.show();
                 return true;
             case R.id.exit:
-                serviceDestroyed = true;
-                try {this.getApplicationContext().unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
-                Intent stopIntent = new Intent(MainActivity.this, PlayerService.class);
-                stopIntent.setAction(Constants.ACTION.STOPFOREGROUND_ACTION);
-                startService(stopIntent);
-                try {this.getApplicationContext().unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
-                this.finish();
+                destroyAppAndService();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
+    }
+
+    private void destroyAppAndService(){
+        serviceDestroyed = true;
+        try {this.getApplicationContext().unbindService(mServiceConnection); } catch (IllegalArgumentException iae){}
+        Intent stopIntent = new Intent(MainActivity.this, PlayerService.class);
+        stopIntent.setAction(Constants.ACTION.STOPFOREGROUND_ACTION);
+        startService(stopIntent);
+        try {this.getApplicationContext().unregisterReceiver(receiver); } catch (IllegalArgumentException iae){}
+        this.finish();
     }
 
     @Override
@@ -573,6 +616,48 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
         else {
             playButton1.setImageResource(android.R.drawable.ic_media_pause);
             playButton2.setImageResource(android.R.drawable.ic_media_pause);
+        }
+    }
+
+    private void setRepeatMode(boolean initiatedFromActivity){
+        Log.d(LOG_TAG, "repeatmode change...: " + mPlayerService.getRepeatMode());
+        switch (mPlayerService.getRepeatMode()){
+            case Constants.REPEAT_MODES.NORMAL_PLAYBACK:
+                if (initiatedFromActivity) {
+                    repeatButton.setImageResource(R.drawable.img_btn_repeat_pressed);
+                    mPlayerService.repeatActivator();
+                    Toast.makeText(getApplicationContext(), "Loop track activated...", Toast.LENGTH_LONG).show();
+                } else repeatButton.setImageResource(R.drawable.img_btn_repeat);
+
+                break;
+            case Constants.REPEAT_MODES.LOOP_TRACK:
+                repeatButton.setImageResource(R.drawable.img_btn_repeat_pressed);
+                if (initiatedFromActivity) {
+                    mPlayerService.repeatActivator();
+                    Toast.makeText(getApplicationContext(), "Loop game activated...", Toast.LENGTH_LONG).show();
+                }
+                break;
+            case Constants.REPEAT_MODES.LOOP_GAME:
+                repeatButton.setImageResource(R.drawable.img_btn_shuffle_pressed);
+                if (initiatedFromActivity) {
+                    mPlayerService.repeatActivator();
+                    Toast.makeText(getApplicationContext(), "Shuffle current game activated...", Toast.LENGTH_LONG).show();
+                }
+                break;
+            case Constants.REPEAT_MODES.SHUFFLE_IN_GAME:
+                repeatButton.setImageResource(R.drawable.img_btn_shuffle_pressed);
+                if (initiatedFromActivity) {
+                    mPlayerService.repeatActivator();
+                    Toast.makeText(getApplicationContext(), "Shuffle in all games activated...", Toast.LENGTH_LONG).show();
+                }
+                break;
+            case Constants.REPEAT_MODES.SHUFFLE_IN_PLATFORM:
+                repeatButton.setImageResource(R.drawable.img_btn_repeat);
+                if (initiatedFromActivity) {
+                    mPlayerService.repeatActivator();
+                    Toast.makeText(getApplicationContext(), "Setting normal playback...", Toast.LENGTH_LONG).show();
+                }
+                break;
         }
     }
 
@@ -925,11 +1010,11 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     Log.d(LOG_TAG,"Permission granted!!");
                     finish();
                     startActivity(getIntent());
-                } else
+                } /*else
                 {
                     Toast.makeText(this, "The app was not allowed to write to your storage. Hence, it cannot function properly. Please consider granting it this permission", Toast.LENGTH_LONG).show();
                     checkForMusicAndInitialize();
-                }
+                }*/
             }
         }
     }

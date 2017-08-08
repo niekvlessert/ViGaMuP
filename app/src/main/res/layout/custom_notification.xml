@@ -2,8 +2,9 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/background_dark"
-    android:orientation="horizontal" >
+    android:background="@color/black"
+    android:orientation="horizontal"
+    android:gravity="center_vertical">
 
     <ImageView
         android:id="@+id/status_bar_album_art"
@@ -30,6 +31,8 @@
         <TextView
             android:id="@+id/status_bar_artist_name"
             android:layout_width="wrap_content"
+            android:textColor="@android:color/white"
+            android:maxLines="1"
             android:layout_height="wrap_content" />
 
     </LinearLayout>
@@ -38,16 +41,24 @@
         android:id="@+id/status_bar_play"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:backgroundTint="@color/black"
+        android:background="@null"
         android:contentDescription="@string/nofication_play"
+        android:scaleType="fitCenter"
+        android:padding="10dip"
         android:src="@android:drawable/ic_media_play" />
 
     <ImageButton
         android:id="@+id/status_bar_next"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:backgroundTint="@color/black"
+        android:background="@null"
         android:contentDescription="@string/nofication_next"
+        android:scaleType="fitCenter"
+        android:padding="10dip"
         android:src="@android:drawable/ic_media_next" />
 
 </LinearLayout>
+
+    <!--android:backgroundTint="@color/black"
+            android:backgroundTint="@color/black"
+-->
