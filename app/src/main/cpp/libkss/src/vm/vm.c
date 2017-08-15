@@ -52,7 +52,7 @@ static uint32_t ioread(VM *vm, uint32_t a) {
   a &= 0xff;
 
   if ((vm->psg) && ((a & 0xff) == 0xA2))
-    return PSG_readIO(vm->psg);
+    return kss_PSG_readIO(vm->psg);
   else if (a == 0xC1)
     return OPL_readIO(vm->opl);
   else if (a == 0xC0)
@@ -89,7 +89,7 @@ static void iowrite(VM *vm, uint32_t a, uint32_t d) {
   case 0xA0:
   case 0xA1:
     if (vm->psg) {
-      PSG_writeIO(vm->psg, a, d);
+      kss_PSG_writeIO(vm->psg, a, d);
       LPDETECT_write(vm->lpde, a, d);
     }
     break;
@@ -189,7 +189,7 @@ VM *VM_new(int rate) {
   memset(vm, 0, sizeof(VM));
 
   vm->sng = SNG_new(MSX_CLK, rate);
-  vm->psg = PSG_new(MSX_CLK, rate);
+  vm->psg = kss_PSG_new(MSX_CLK, rate);
   vm->scc = SCC_new(MSX_CLK, rate);
   vm->opll = kss_OPLL_new(MSX_CLK, rate);
   vm->opl = OPL_new(MSX_CLK, rate);
@@ -211,7 +211,7 @@ void VM_delete(VM *vm) {
   MMAP_delete(vm->mmap);
   LPDETECT_delete(vm->lpde);
   SNG_delete(vm->sng);
-  PSG_delete(vm->psg);
+  kss_PSG_delete(vm->psg);
   SCC_delete(vm->scc);
   kss_OPLL_delete(vm->opll);
   OPL_delete(vm->opl);
@@ -235,7 +235,7 @@ void VM_set_clock(VM *vm, uint32_t clock, uint32_t vsync_freq) {
 }
 
 void VM_reset_device(VM *vm) {
-  PSG_reset(vm->psg);
+  kss_PSG_reset(vm->psg);
   VM_set_PSG_type(vm, vm->psg_type);
   SCC_reset(vm->scc);
   VM_set_SCC_type(vm, vm->scc_type);
@@ -251,11 +251,11 @@ void VM_set_PSG_type(VM *vm, uint32_t psg_type) {
     return;
 
   if (psg_type == VM_PSG_AUTO)
-    PSG_setVolumeMode(vm->psg, EMU2149_VOL_DEFAULT);
+    kss_PSG_setVolumeMode(vm->psg, EMU2149_VOL_DEFAULT);
   else if (psg_type == VM_PSG_AY)
-    PSG_setVolumeMode(vm->psg, EMU2149_VOL_AY_3_8910);
+    kss_PSG_setVolumeMode(vm->psg, EMU2149_VOL_AY_3_8910);
   else if (psg_type == VM_PSG_YM)
-    PSG_setVolumeMode(vm->psg, EMU2149_VOL_YM2149);
+    kss_PSG_setVolumeMode(vm->psg, EMU2149_VOL_YM2149);
   vm->psg_type = psg_type;
 }
 

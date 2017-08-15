@@ -291,7 +291,7 @@ UINT8 CmdList[0x100]; // used by VGMPlay.c and VGMPlay_AddFmts.c
 bool ErrorHappened;   // used by VGMPlay.c and VGMPlay_AddFmts.c
 
 // Options Variables
-UINT32 SampleRate;	// Note: also used by some sound cores to determinate the chip sample rate
+extern UINT32 SampleRate;	// Note: also used by some sound cores to determinate the chip sample rate
 
 UINT32 VGMMaxLoop;
 UINT32 VGMPbRate;	// in Hz, ignored if this value or VGM's lngRate Header value is 0
@@ -432,7 +432,7 @@ void VGMPlay_Init(void)
 	CHIP_OPTS* TempCOpt;
 	CAUD_ATTR* TempCAud;
 	
-	SampleRate = 44100;
+	//SampleRate = 48000;
 	FadeTime = 5000;
 	PauseTime = 0;
 	

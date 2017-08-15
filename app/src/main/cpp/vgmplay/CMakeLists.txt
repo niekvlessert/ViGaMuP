@@ -26,13 +26,8 @@ list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/main/cpp/vgmplay/src/VGMPlay
 list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/main/cpp/vgmplay/src/Stream.c")
 list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/main/cpp/vgmplay/src/pt_ioctl.c")
 list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/main/cpp/vgmplay/src/chips/scsplfo.c")
-list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/main/cpp/vgmplay/src/chips/emu2413.c") #be careful, libss has this to... see fix.sh in libkss
-#list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/main/cpp/vgmplay/src/chips/sn76489.c")
-#list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/main/cpp/vgmplay/src/chips/sn76496.c")
-#list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/main/cpp/vgmplay/src/chips/ay8910.c")
-list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/main/cpp/vgmplay/src/chips/emu2149.c") #this will scew up psg emulation in libkss... disable it
-list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/main/cpp/vgmplay/src/vgm2pcm.c")
-list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/main/cpp/vgmplay/src/vgm2wav.c")
+#list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/main/cpp/vgmplay/src/chips/emu2413.c") #be careful, libkss has this to... see fix.sh in libkss
+#list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/main/cpp/vgmplay/src/chips/emu2149.c") #this will screw up psg emulation in libkss... see fix.sh as well
 
 add_library(vgmplay STATIC ${SOURCES})
 target_link_libraries(vgmplay z m)

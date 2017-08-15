@@ -252,7 +252,7 @@ KSSPLAY *KSSPLAY_new(uint32_t rate, uint32_t nch, uint32_t bps) {
 void KSSPLAY_set_device_quality(KSSPLAY *kssplay, uint32_t devnum, uint32_t quality) {
   switch (devnum) {
   case EDSC_PSG:
-    PSG_set_quality(kssplay->vm->psg, quality);
+    kss_PSG_set_quality(kssplay->vm->psg, quality);
     SNG_set_quality(kssplay->vm->sng, quality);
     break;
   case EDSC_SCC:
@@ -446,7 +446,7 @@ static inline void calc_per_ch(KSSPLAY *kssplay, KSSPLAY_PER_CH_OUT *out) {
       SNG_calc(kssplay->vm->sng);
       memcpy(out->sng, kssplay->vm->sng->ch_out, sizeof(out->sng));
     } else {
-      PSG_calc(kssplay->vm->psg);
+      kss_PSG_calc(kssplay->vm->psg);
       memcpy(out->psg, kssplay->vm->psg->ch_out, sizeof(out->psg));
     }
   }
@@ -501,7 +501,7 @@ static inline void calc_mono(KSSPLAY *kssplay, int16_t *buf, uint32_t length) {
       if (kssplay->kss->sn76489) {
         d += apply_volume(FIR_calc(kssplay->device_fir[0][EDSC_PSG], SNG_calc(kssplay->vm->sng)), volume[EDSC_PSG]);
       } else {
-        d += apply_volume(FIR_calc(kssplay->device_fir[0][EDSC_PSG], PSG_calc(kssplay->vm->psg) + kssplay->vm->DA1),
+        d += apply_volume(FIR_calc(kssplay->device_fir[0][EDSC_PSG], kss_PSG_calc(kssplay->vm->psg) + kssplay->vm->DA1),
                           volume[EDSC_PSG]);
       }
     }
@@ -576,7 +576,7 @@ static inline void calc_stereo(KSSPLAY *kssplay, int16_t *buf, uint32_t length) 
           ch[1] += apply_volume(c, volume[EDSC_PSG][1]);
         }
       } else {
-        c = FIR_calc(kssplay->device_fir[0][EDSC_PSG], PSG_calc(kssplay->vm->psg) + kssplay->vm->DA1);
+        c = FIR_calc(kssplay->device_fir[0][EDSC_PSG], kss_PSG_calc(kssplay->vm->psg) + kssplay->vm->DA1);
         ch[0] += apply_volume(c, volume[EDSC_PSG][0]);
         ch[1] += apply_volume(c, volume[EDSC_PSG][1]);
       }
@@ -665,7 +665,7 @@ void KSSPLAY_set_channel_mask(KSSPLAY *kssplay, uint32_t device, uint32_t mask) 
   switch (device) {
   case EDSC_PSG:
     if (kssplay->vm->psg) {
-      PSG_setMask(kssplay->vm->psg, mask);
+      kss_PSG_setMask(kssplay->vm->psg, mask);
     }
     break;
   case EDSC_SCC:

@@ -4,10 +4,10 @@
 
   2001 04-28 : Version 1.00beta -- 1st Beta Release.
   2001 08-14 : Version 1.10
-  2001 10-03 : Version 1.11     -- Added PSG_set_quality().
+  2001 10-03 : Version 1.11     -- Added kss_PSG_set_quality().
   2002 03-02 : Version 1.12     -- Removed PSG_init & PSG_close.
   2002 10-13 : Version 1.14     -- Fixed the envelope unit.
-  2003 09-19 : Version 1.15     -- Added PSG_setMask and PSG_toggleMask
+  2003 09-19 : Version 1.15     -- Added kss_PSG_setMask and kss_PSG_toggleMask
   2004 01-11 : Version 1.16     -- Fixed the envelope problem where the envelope 
                                    frequency register is written before key-on.
   2015 12-13 : Version 1.17     -- Changed own integer types to C99 stdint.h types.
@@ -62,21 +62,21 @@ internal_refresh (PSG * psg)
 }
 
 void
-PSG_set_rate (PSG * psg, uint32_t r)
+kss_PSG_set_rate (PSG * psg, uint32_t r)
 {
   psg->rate = r ? r : 44100;
   internal_refresh (psg);
 }
 
 void
-PSG_set_quality (PSG * psg, uint32_t q)
+kss_PSG_set_quality (PSG * psg, uint32_t q)
 {
   psg->quality = q;
   internal_refresh (psg);
 }
 
 PSG *
-PSG_new (uint32_t c, uint32_t r)
+kss_PSG_new (uint32_t c, uint32_t r)
 {
   PSG *psg;
 
@@ -84,16 +84,16 @@ PSG_new (uint32_t c, uint32_t r)
   if (psg == NULL)
     return NULL;
 
-  PSG_setVolumeMode (psg, EMU2149_VOL_DEFAULT);
+  kss_PSG_setVolumeMode (psg, EMU2149_VOL_DEFAULT);
   psg->clk = c;
   psg->rate = r ? r : 44100;
-  PSG_set_quality (psg, 0);
+  kss_PSG_set_quality (psg, 0);
 
   return psg;
 }
 
 void
-PSG_setVolumeMode (PSG * psg, int type)
+kss_PSG_setVolumeMode (PSG * psg, int type)
 {
   switch (type)
   {
@@ -110,7 +110,7 @@ PSG_setVolumeMode (PSG * psg, int type)
 }
 
 uint32_t
-PSG_setMask (PSG *psg, uint32_t mask)
+kss_PSG_setMask (PSG *psg, uint32_t mask)
 {
   uint32_t ret = 0;
   if(psg)
@@ -122,7 +122,7 @@ PSG_setMask (PSG *psg, uint32_t mask)
 }
 
 uint32_t
-PSG_toggleMask (PSG *psg, uint32_t mask)
+kss_PSG_toggleMask (PSG *psg, uint32_t mask)
 {
   uint32_t ret = 0;
   if(psg)
@@ -134,7 +134,7 @@ PSG_toggleMask (PSG *psg, uint32_t mask)
 }
 
 void
-PSG_reset (PSG * psg)
+kss_PSG_reset (PSG * psg)
 {
   int i;
 
@@ -170,29 +170,29 @@ PSG_reset (PSG * psg)
 }
 
 void
-PSG_delete (PSG * psg)
+kss_PSG_delete (PSG * psg)
 {
   free (psg);
 }
 
 uint8_t
-PSG_readIO (PSG * psg)
+kss_PSG_readIO (PSG * psg)
 {
   return (uint8_t) (psg->reg[psg->adr]);
 }
 
 uint8_t
-PSG_readReg (PSG * psg, uint32_t reg)
+kss_PSG_readReg (PSG * psg, uint32_t reg)
 {
   return (uint8_t) (psg->reg[reg & 0x1f]);
 
 }
 
 void
-PSG_writeIO (PSG * psg, uint32_t adr, uint32_t val)
+kss_PSG_writeIO (PSG * psg, uint32_t adr, uint32_t val)
 {
   if (adr & 1)
-    PSG_writeReg (psg, psg->adr, val);
+    kss_PSG_writeReg (psg, psg->adr, val);
   else
     psg->adr = val & 0x1f;
 }
@@ -266,7 +266,7 @@ update_output (PSG * psg)
       }
     }
 
-    if (psg->mask&PSG_MASK_CH(i))
+    if (psg->mask&kss_PSG_MASK_CH(i))
       continue;
 
     if ((psg->tmask[i]||psg->edge[i]) && (psg->nmask[i]||noise))
@@ -289,7 +289,7 @@ mix_output(PSG *psg) {
 }
 
 int16_t
-PSG_calc (PSG * psg)
+kss_PSG_calc (PSG * psg)
 {
   if (!psg->quality) {
     update_output(psg);
@@ -308,7 +308,7 @@ PSG_calc (PSG * psg)
 }
 
 void
-PSG_writeReg (PSG * psg, uint32_t reg, uint32_t val)
+kss_PSG_writeReg (PSG * psg, uint32_t reg, uint32_t val)
 {
   int c;
 

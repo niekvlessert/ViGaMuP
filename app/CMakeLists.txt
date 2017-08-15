@@ -47,7 +47,7 @@ target_link_libraries(kss_player
                       android
                       log
                       OpenSLES
-                      kss
-                      vgmplay)
+                      vgmplay
+                      kss)
 
-
+#vgmplay

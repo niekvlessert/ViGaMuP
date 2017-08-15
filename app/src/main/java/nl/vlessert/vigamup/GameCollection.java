@@ -79,6 +79,23 @@ public class GameCollection{
             foundMusicTypes.add(Constants.PLATFORM.SNES);
         }
 
+        storedPosition = position;
+        parentDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/VGM/");
+        files = parentDir.listFiles();
+        if (files!=null) {
+            for (File file : files) {
+                if (file.getName().endsWith(".zip")) {
+                    strings = file.getName().split("\\.");
+                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.VGM, ctx, position));
+                    position++;
+                }
+            }
+        }
+        if (position>storedPosition) {
+            Log.d(LOG_TAG,"foundMusicTypes.add(Constants.PLATFORM.VGM");
+            foundMusicTypes.add(Constants.PLATFORM.VGM);
+        }
+
         gameObjectsWithTrackInformation = new ArrayList<>();
         gameObjectsWithoutTrackInformation = new ArrayList<>();
         for (Game game : gameObjects){

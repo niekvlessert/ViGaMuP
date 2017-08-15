@@ -1115,7 +1115,7 @@ void ymf278b_clearRam(YMF278BChip* chip)
 
 static void ymf278b_load_rom(YMF278BChip *chip)
 {
-	const char* ROM_FILENAME = "yrw801.rom";
+	const char* ROM_FILENAME = "/sdcard/Download/ViGaMuP/yrw801.rom";
 	char* FileName;
 	FILE* hFile;
 	size_t RetVal;

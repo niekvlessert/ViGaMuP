@@ -33,6 +33,8 @@ public class Game {
     public int position = 0;
     private boolean trackInformationAvailable = true;
 
+    private HelperFunctions helpers;
+
     private Context ctx;
 
     public String vendor = "";
@@ -61,6 +63,10 @@ public class Game {
             musicExtension="SPC";
             musicArchive=".rsn";
         }
+        if (musicType == Constants.PLATFORM.VGM) {
+            musicExtension="VGM";
+            musicArchive=".zip";
+        }
         this.musicFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + musicArchive);
         this.musicFileC = "/sdcard/Download/ViGaMuP/" + musicExtension + "/" + gameName + musicArchive;
         this.imageFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".png");
@@ -69,7 +75,9 @@ public class Game {
         readGameInfo(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".gameinfo"));
         if (!readTrackInformation(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".trackinfo"))){
             trackInformationAvailable = false;
-        };
+        }
+
+        helpers = new HelperFunctions();
     }
 
     public boolean readTrackInformation(File trackInfoFile){
@@ -293,6 +301,16 @@ public class Game {
         Log.d("KSS","Spcfilename: " + spcFileName + ", rsnfilename: " + rsnFileName);
         ExtractArchive ea = new ExtractArchive();
         ea.extractFileFromArchive(new File(rsnFileName), new File(spcFileName), new File(Constants.vigamupDirectory + "tmp/"));
+    }
+
+    public void extractCurrentVgmTrackfromZip() {
+        String vgmFileName = getCurrentTrackFileName();
+        String zipFileName = musicFileC;
+        try {
+            helpers.unzip(new File(zipFileName), new File(Constants.vigamupDirectory+"tmp"));
+        } catch (IOException e) {
+            Log.d("VGM", e.toString());
+        }
     }
 
     public String getCurrentTrackFileNameFullPath() { return Constants.vigamupDirectory+"tmp/"+trackInformation.get(position).getFileName(); }

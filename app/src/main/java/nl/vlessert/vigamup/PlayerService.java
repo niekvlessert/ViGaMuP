@@ -632,6 +632,15 @@ public class PlayerService extends Service{
                 currentGame.extractCurrentSpcTrackfromRSN();
                 startSpcPlayback(currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackLength());
                 break;
+            case 2:
+                secondsPlayedFromCurrentTrack = 0;
+                secondsBufferedFromCurrentTrack = 0;
+                String track = currentGame.getCurrentTrackFileNameFullPath();
+                track = track.replace(";;;",",");
+                Log.d(LOG_TAG, "track to play: "+track);
+                currentGame.extractCurrentVgmTrackfromZip();
+                startVgmPlayback(track, currentGame.getCurrentTrackLength());
+                break;
         }
 
         sendBroadcast(new Intent("resetSeekBar"));
@@ -688,6 +697,15 @@ public class PlayerService extends Service{
                 currentGame.extractCurrentSpcTrackfromRSN();
                 startSpcPlayback(currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackLength());
                 break;
+            case 2:
+                secondsPlayedFromCurrentTrack = 0;
+                secondsBufferedFromCurrentTrack = 0;
+                String track = currentGame.getCurrentTrackFileNameFullPath();
+                track = track.replace(";;;",",");
+                Log.d(LOG_TAG, "track to play: "+track);
+                currentGame.extractCurrentVgmTrackfromZip();
+                startVgmPlayback(track, currentGame.getCurrentTrackLength());
+                break;
         }
 
         sendBroadcast(new Intent("resetSeekBar"));
@@ -723,6 +741,23 @@ public class PlayerService extends Service{
 
         //game.extractCurrentSpcTrackfromRSN();
         startSpcPlayback(fileName, game.getCurrentTrackLength());
+
+        updateNotificationTitles();
+        updateA2DPInfo();
+        setPlayingStatePlaying();
+
+        if (paused) paused = togglePlayback();
+    }
+
+    public void playVgm(String fileName){
+        Game game = gameCollection.getCurrentGame();
+        secondsPlayedFromCurrentTrack = 0;
+        secondsBufferedFromCurrentTrack = 0;
+
+        //game.extractCurrentSpcTrackfromRSN();
+        fileName = fileName.replaceAll(";;;",",");
+        Log.d(LOG_TAG, "track to play: " + fileName);
+        startVgmPlayback(fileName, game.getCurrentTrackLength());
 
         updateNotificationTitles();
         updateA2DPInfo();
@@ -1029,6 +1064,7 @@ public class PlayerService extends Service{
     public static native void setKssTrack(int track, int length);
     public static native void startKssPlayback();
     public static native void startSpcPlayback(String fileName, int length);
+    public static native void startVgmPlayback(String fileName, int length);
     public static native boolean togglePlayback();
     public static native void pausePlayback();
     public static native void resumePlayback();

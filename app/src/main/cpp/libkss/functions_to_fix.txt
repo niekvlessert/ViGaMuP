@@ -15,3 +15,17 @@ OPLL_setPatch
 OPLL_set_quality
 OPLL_set_rate
 OPLL_writeIO
+PSG_MASK_CH
+PSG_set_quality
+PSG_set_rate
+PSG_reset
+PSG_delete
+PSG_writeReg
+PSG_writeIO
+PSG_readReg
+PSG_readIO
+PSG_calc
+PSG_setVolumeMode
+PSG_setMask
+PSG_toggleMask
+PSG_new

@@ -8,7 +8,7 @@
 #define EMU2149_VOL_YM2149 0
 #define EMU2149_VOL_AY_3_8910 1
 
-#define PSG_MASK_CH(x) (1<<(x))
+#define kss_PSG_MASK_CH(x) (1<<(x))
 
 #ifdef __cplusplus
 extern "C"
@@ -67,19 +67,19 @@ extern "C"
 
   } PSG;
 
-  void PSG_set_quality (PSG * psg, uint32_t q);
-  void PSG_set_rate (PSG * psg, uint32_t r);
-  PSG *PSG_new (uint32_t clk, uint32_t rate);
-  void PSG_reset (PSG *);
-  void PSG_delete (PSG *);
-  void PSG_writeReg (PSG *, uint32_t reg, uint32_t val);
-  void PSG_writeIO (PSG * psg, uint32_t adr, uint32_t val);
-  uint8_t PSG_readReg (PSG * psg, uint32_t reg);
-  uint8_t PSG_readIO (PSG * psg);
-  int16_t PSG_calc (PSG *);
-  void PSG_setVolumeMode (PSG * psg, int type);
-  uint32_t PSG_setMask (PSG *, uint32_t mask);
-  uint32_t PSG_toggleMask (PSG *, uint32_t mask);
+  void kss_PSG_set_quality (PSG * psg, uint32_t q);
+  void kss_PSG_set_rate (PSG * psg, uint32_t r);
+  PSG *kss_PSG_new (uint32_t clk, uint32_t rate);
+  void kss_PSG_reset (PSG *);
+  void kss_PSG_delete (PSG *);
+  void kss_PSG_writeReg (PSG *, uint32_t reg, uint32_t val);
+  void kss_PSG_writeIO (PSG * psg, uint32_t adr, uint32_t val);
+  uint8_t kss_PSG_readReg (PSG * psg, uint32_t reg);
+  uint8_t kss_PSG_readIO (PSG * psg);
+  int16_t kss_PSG_calc (PSG *);
+  void kss_PSG_setVolumeMode (PSG * psg, int type);
+  uint32_t kss_PSG_setMask (PSG *, uint32_t mask);
+  uint32_t kss_PSG_toggleMask (PSG *, uint32_t mask);
     
 #ifdef __cplusplus
 }

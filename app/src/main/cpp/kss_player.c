@@ -66,9 +66,10 @@ int slesThingsCreated = 0;
 
 long previousSum = 0;
 
+
 // 0 = MSX
 // 5 = SPC
-// 10 = PC
+// 10 = VGM
 
 int activeGameType = 0;
 
@@ -78,6 +79,9 @@ pthread_mutex_t lock;
 pthread_t t1;
 
 int deviceSampleRate = 48000;
+UINT32 SampleRate = 48000;
+//UINT32 VGMMaxLoopM;
+//UINT32 VGMCurLoop;
 
 int16_t *queueBuffer1, *queueBuffer2, *queueBuffer3;
 int16_t *queueBufferSilence;
@@ -216,7 +220,7 @@ void* generateAudioThread(void* context){
     int queueSecondResult=0;
     while(1)
     {
-        if (!loopTrack || activeGameType==5) {
+        if (!loopTrack || activeGameType==5 || activeGameType==10) {
 
             if (loopTrackWasEnabled) { //fade to next track...
                 initialDataCopied = 1;
@@ -241,12 +245,15 @@ void* generateAudioThread(void* context){
                 }
 
                 if (activeGameType == 0) KSSPLAY_calc(kssplay, &fullTrackWavebuf[(trackLength - secondsToGenerate) * deviceSampleRate * 2], deviceSampleRate);
-                    else {
+                if (activeGameType == 5) {
                         pthread_mutex_lock(&lock);
                         //__android_log_print(ANDROID_LOG_INFO, "KSS", "buffering... %d", trackLength - secondsToGenerate);
                         gme_play(emu, deviceSampleRate*2, &fullTrackWavebuf[(trackLength - secondsToGenerate) * deviceSampleRate * 2]);
                         pthread_mutex_unlock(&lock);
-                    }
+                }
+                if (activeGameType == 10) {
+                    FillBuffer( &fullTrackWavebuf[(trackLength - secondsToGenerate) * deviceSampleRate * 2], deviceSampleRate);
+                }
 
                 (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setBufferBarProgressId);
                 secondsToGenerate--;
@@ -264,8 +271,8 @@ void* generateAudioThread(void* context){
             }
             isBuffering = 0;
             if (isPlaying && !nextMessageSend && secondsPlayed == trackLength && trackLength != 0) {
-                __android_log_print(ANDROID_LOG_INFO, "KSS", "is playing! %d %d %d %d", isPlaying,
-                                    nextMessageSend, secondsPlayed, trackLength);
+                __android_log_print(ANDROID_LOG_INFO, "KSS", "is playing! %d %d %d %d %d", isPlaying,
+                                    nextMessageSend, secondsPlayed, trackLength, nextTrackId);
                 sleep(2);
 
                 //if (activeGameType == 0) {
@@ -518,7 +525,70 @@ void Java_nl_vlessert_vigamup_PlayerService_startSpcPlayback(JNIEnv* env, jclass
 
 void Java_nl_vlessert_vigamup_PlayerService_startVgmPlayback(JNIEnv* env, jclass clazz, char *file, int secondsToPlay) {
     const char *utf8File = (*env)->GetStringUTFChars(env, file, NULL);
-    //VGMPlay_Init();
+
+    int8_t bufferSize;
+
+    //secondsToPlay = secondsToPlay + 90;
+    initialDataCopied = 0;
+    generatingAllowed = 0;
+    queueSecond = 0;
+    secondsPlayed = 0;
+    secondsToGenerate = secondsToPlay;
+    trackLength = secondsToPlay;
+    skipToNextTrack = 0;
+    activeGameType = 10;
+    secondsToSkipWhenCopyingToBuffer = 2;
+
+    if (isPlaying) {
+        isPlaying=0;
+        if (isBuffering==1) secondsToSkipWhenCopyingToBuffer = 1; // ugly fix for weird queue problem... probably some timing issue, can't find it...
+        while (isBuffering==1){
+            usleep(5000);
+        }
+
+        SLresult result = (*bqPlayerBufferQueue)->Clear(bqPlayerBufferQueue);
+        if (SL_RESULT_SUCCESS != result) {
+            __android_log_print(ANDROID_LOG_INFO, "KSS", "Clear failed, result=%d\n", result);
+            return;
+        }
+
+        StopVGM();
+
+        CloseVGMFile();
+
+        VGMPlay_Deinit();
+
+        if (fullTrackWavebuf!=NULL) free(fullTrackWavebuf);
+        //sleep (1);
+    }
+
+    VGMPlay_Init();
+    //VGMMaxLoopM = 0x1;
+    //VGMCurLoop = 0x1;
+    VGMPlay_Init2();
+    if (!OpenVGMFile(utf8File)){
+        __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_Glue", "File error!!\n");
+
+    };
+    PlayVGM();
+
+    fullTrackWavebuf = malloc(deviceSampleRate * 4 * secondsToPlay);
+
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_Glue", "Hier??\n");
+
+    bufferSize = FillBuffer(wavebuf, deviceSampleRate);
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_Glue", "Buffer size: %d\n",bufferSize);
+    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf, deviceSampleRate*4);
+
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_Glue", "Of Hier??\n");
+
+    bufferSize = FillBuffer(wavebuf2, deviceSampleRate);
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_Glue", "Buffer size 2: %d\n",bufferSize);
+    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf2, deviceSampleRate*4);
+
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_Glue", "En Hier dan??\n");
+
+    isPlaying = 1;
 }
 
 
@@ -598,6 +668,7 @@ void Java_nl_vlessert_vigamup_PlayerService_createEngine(JNIEnv* env, jobject in
     fullTrackWavebuf = NULL;
 
     wavebuf = malloc(deviceSampleRate * 2 * sizeof(int16_t));
+    __android_log_print(ANDROID_LOG_INFO, "KSS", "wavebuf size: %d", deviceSampleRate * 2 * sizeof(int16_t));
     wavebuf2 = malloc(deviceSampleRate * 2 * sizeof(int16_t));
 }
 
