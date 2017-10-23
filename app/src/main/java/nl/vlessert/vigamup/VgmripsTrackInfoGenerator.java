@@ -86,18 +86,19 @@ public class VgmripsTrackInfoGenerator implements Runnable{
                     }
                     is.close();
                     byte[] trackLength = new byte[]{header[0x1b], header[0x1a], header[0x19], header[0x18]};
-                    Log.d("VGM", "value: " + Integer.toHexString(header[0x18] & 0xff));
-                    Log.d("VGM", "value: " + Integer.toHexString(header[0x19] & 0xff));
-                    Log.d("VGM", "value: " + Integer.toHexString(header[0x1a] & 0xff));
-                    Log.d("VGM", "value: " + Integer.toHexString(header[0x1b] & 0xff ));
+                    //Log.d("VGM", "value: " + Integer.toHexString(header[0x18] & 0xff));
+                    //Log.d("VGM", "value: " + Integer.toHexString(header[0x19] & 0xff));
+                    //Log.d("VGM", "value: " + Integer.toHexString(header[0x1a] & 0xff));
+                    //Log.d("VGM", "value: " + Integer.toHexString(header[0x1b] & 0xff ));
                     //Log.d("VGM", "samen: " + Long.parseLong(Integer.toHexString(header[0x18] & 0xff)+Integer.toHexString(header[0x19] & 0xff)+Integer.toHexString(header[0x1a] & 0xff)+Integer.toHexString(header[0x1b] & 0xff), 16));
-                    Log.d("VGM", "samen: " + helpers.bytesToHex(trackLength));
+                    Log.d("VGM", "tracklength: " + Long.parseLong(helpers.bytesToHex(trackLength), 16)/44100);
                     byte[] loopLength = new byte[]{header[0x23], header[0x22], header[0x21], header[0x20]};
+                    Log.d("VGM", "looplength: " + Long.parseLong(helpers.bytesToHex(loopLength), 16)/44100);
                     Long trackLengthLong = Long.parseLong(helpers.bytesToHex(trackLength), 16);
                     Long loopLengthLong = Long.parseLong(helpers.bytesToHex(loopLength), 16);
-                    if (loopLengthLong > 0) trackLengthLong *= 2;
+                    if (loopLengthLong > 0) trackLengthLong = trackLengthLong + (1*loopLengthLong);
                     Long trackLengthSecondsLong = trackLengthLong/44100;
-                    trackLengthSeconds = helpers.safeLongToInt(trackLengthSecondsLong);
+                    trackLengthSeconds = helpers.safeLongToInt(trackLengthSecondsLong)+5;
                     Log.d("VGM", "ok, tracklengthlong: " + trackLengthLong + ", seconds: " + trackLengthSeconds);
                     if (splitChar.length()==0) {
                         if (fileNameNoPath.indexOf(" ")==2) splitChar = " ";

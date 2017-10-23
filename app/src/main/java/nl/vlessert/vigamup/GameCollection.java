@@ -53,7 +53,7 @@ public class GameCollection{
             for (File file : files) {
                 if (file.getName().endsWith(".kss")) {
                     strings = file.getName().split("\\.");
-                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.MSX, ctx, position));
+                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.MSX, ctx, 0));
                     position++;
                 }
             }
@@ -69,7 +69,7 @@ public class GameCollection{
             for (File file : files) {
                 if (file.getName().endsWith(".rsn")) {
                     strings = file.getName().split("\\.");
-                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.SNES, ctx, position));
+                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.SNES, ctx, 0));
                     position++;
                 }
             }
@@ -86,7 +86,7 @@ public class GameCollection{
             for (File file : files) {
                 if (file.getName().endsWith(".zip")) {
                     strings = file.getName().split("\\.");
-                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.VGM, ctx, position));
+                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.VGM, ctx, 0));
                     position++;
                 }
             }

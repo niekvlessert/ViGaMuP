@@ -127,10 +127,7 @@ public class Game {
                 }
                 line = reader.readLine();
 
-                //if (gameName.equals("kingsvalley2")) Log.d("KSS", "will it add " + title+"??");
-
                 if (trackList.contains(track)) {
-                    //if (gameName.equals("kingsvalley2")) Log.d("KSS", "adding track to " + gameName + ": " + track + " " + title + " " + length);
                     trackInformation.add(new GameTrack(track, title, length, partToSkip, repeatable, trackNumber, fileName));
                     addedTracks.add(track);
                 }
@@ -313,7 +310,16 @@ public class Game {
         }
     }
 
-    public String getCurrentTrackFileNameFullPath() { return Constants.vigamupDirectory+"tmp/"+trackInformation.get(position).getFileName(); }
+    public String getCurrentTrackFileNameFullPath() {
+        switch (musicType){
+            case Constants.PLATFORM.MSX:
+                return musicFileC;
+            case Constants.PLATFORM.SNES:
+            case Constants.PLATFORM.VGM:
+                return Constants.vigamupDirectory+"tmp/"+trackInformation.get(position).getFileName();
+        }
+        return null;
+    }
 
     public void setTrack(int position){
         this.position = position;

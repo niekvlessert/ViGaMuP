@@ -119,6 +119,8 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
     private boolean rebuildMusicList = false;
     private boolean firstRun = false;
 
+    private boolean firstTimePlayButtonPressed = true;
+
     private boolean serviceDestroyed = false;
 
     private HelperFunctions helpers;
@@ -201,8 +203,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
             @Override
             public void onClick(View v) {
-                // TODO Auto-generated method stub
-                Log.v("ImageButton", "Clicked!");
+                //Log.v("ImageButton", "Clicked!");
                 //Log.v(LOG_TAG, "Hmmm.... " + mPlayerService.getPaused());
                 mPlayerService.togglePlaybackJava();
                 setPlayButtonInPlayerBar();
@@ -275,7 +276,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
             public void onStopTrackingTouch(SeekBar seekBar) {
                 // Notification that the user has finished a touch gesture.
                 //Log.d("KSS","seekbar onStopTrackingTouch: " + seekBar.getProgress());
-                mPlayerService.setKssProgressJava(seekBar.getProgress());
+                mPlayerService.setProgressJava(seekBar.getProgress());
                 seekBarThumbProgress = seekBar.getProgress();
             }
         });
@@ -904,7 +905,10 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
             currentShowedGameTitle="";
             showGame(-1);
         } else {
-            //gameCollection.setCurrentGame(position);
+            if (mPlayerService.getPaused() && firstTimePlayButtonPressed) {
+                gameCollection.setCurrentGame(position);
+                firstTimePlayButtonPressed = false;
+            }
             currentShowedGameTitle="";
             showGame(position);
         }
@@ -963,72 +967,19 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     if (gamePosition!=-1) game = gameCollection.getGameAtPosition(gamePosition);
                     else game = gameCollection.getCurrentGame();
                     game.setTrack(position - 1);
-                    if (game.getMusicType()==Constants.PLATFORM.MSX) {
-                        // No idea why it should be done outside the thread... maybe the same problem as the hanging spc audio??
-                        mPlayerService.setKssJava(game.musicFileC);
-                        class PlayKssInThread implements Runnable {
-                            private PlayKssInThread(){}
-                            public void run() {
-                                if (gamePosition!=-1) gameCollection.setCurrentGame(gamePosition);
-                                Game game = gameCollection.getCurrentGame();
-                                //mPlayerService.setKssJava(game.musicFileC);
-                                seekBar.setMax(game.getCurrentTrackLength());
-                                bufferBarProgress = 2; // 2 seconds buffered always in advance...
-                                seekBarThumbProgress = 0;
-                                seekBar.setProgress(0);
-                                mPlayerService.playCurrentTrack();
-                            }
+                    Thread t = new Thread(new Runnable() {
+                        public void run() {
+                            if (gamePosition!=-1) gameCollection.setCurrentGame(gamePosition);
+                            Game game = gameCollection.getCurrentGame();
+                            seekBar.setMax(game.getCurrentTrackLength());
+                            bufferBarProgress = 2; // 2 seconds buffered always in advance...
+                            seekBarThumbProgress = 0;
+                            seekBar.setProgress(0);
+                            mPlayerService.playCurrentTrack();
                         }
-
-                        Thread t = new Thread(new PlayKssInThread());
-
-                        t.start();
-                        try { t.join(); } catch (InterruptedException ie){}
-
-                    }
-                    if (game.getMusicType()==Constants.PLATFORM.SNES) {
-                        Thread t = new Thread(new Runnable() {
-                            public void run() {
-                                if (gamePosition!=-1) gameCollection.setCurrentGame(gamePosition);
-                                Game game = gameCollection.getCurrentGame();
-                                seekBar.setMax(game.getCurrentTrackLength());
-                                bufferBarProgress = 2; // 2 seconds buffered always in advance...
-                                seekBarThumbProgress = 0;
-                                seekBar.setProgress(0);
-                                String spcFileName = game.getCurrentTrackFileName();
-                                String rsnFileName = game.musicFileC;
-                                ExtractArchive ea = new ExtractArchive();
-                                ea.extractFileFromArchive(new File(rsnFileName), new File(spcFileName), new File(Constants.vigamupDirectory + "tmp/"));
-                                Log.d(LOG_TAG, "filename: " + spcFileName);
-                                mPlayerService.playSpc(Constants.vigamupDirectory + "tmp/" + spcFileName);
-                            }
-                        });
-
-                        t.start();
-                        try { t.join(); } catch (InterruptedException ie){}
-                    }
-                    if (game.getMusicType()==Constants.PLATFORM.VGM) {
-                        Thread t = new Thread(new Runnable() {
-                            public void run() {
-                                if (gamePosition!=-1) gameCollection.setCurrentGame(gamePosition);
-                                Game game = gameCollection.getCurrentGame();
-                                seekBar.setMax(game.getCurrentTrackLength());
-                                bufferBarProgress = 2; // 2 seconds buffered always in advance...
-                                seekBarThumbProgress = 0;
-                                seekBar.setProgress(0);
-                                try {
-                                    helpers.unzip(new File(game.musicFileC), new File(Constants.vigamupDirectory+"tmp"));
-                                } catch (IOException e) {
-                                    Log.d("VGM", e.toString());
-                                }
-                                Log.d(LOG_TAG, "filename: " + game.getCurrentTrackFileName());
-                                mPlayerService.playVgm(Constants.vigamupDirectory + "tmp/" + game.getCurrentTrackFileName());
-                            }
-                        });
-
-                        t.start();
-                        try { t.join(); } catch (InterruptedException ie){}
-                    }
+                    });
+                    t.start();
+                    try { t.join(); } catch (InterruptedException ie){}
 
                     setPlayButtonInPlayerBar();
                     setTrackInfoInPlayerBar();
@@ -1153,13 +1104,14 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
     private void setBufferBarProgress(int bufferBarProgress){
         this.bufferBarProgress = bufferBarProgress+2;
-        //Log.d(LOG_TAG,"buffer bar should be set to " + bufferBarProgress);
+        //Log.d(LOG_TAG,"buffer bar should be set to " + this.bufferBarProgress);
         seekBar.setSecondaryProgress(this.bufferBarProgress);
     }
 
     private void setSeekBarThumbProgress(int seekBarThumbProgress){
         this.seekBarThumbProgress = seekBarThumbProgress;
-        //Log.d(LOG_TAG,"seek bar should be set to " + seekBarThumbProgress);
+        Log.d(LOG_TAG,"seek bar should be set to " + seekBarThumbProgress);
+        Log.d(LOG_TAG,"max size = " + seekBar.getMax());
         seekBar.setProgress(seekBarThumbProgress);
     }
 

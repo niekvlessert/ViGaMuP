@@ -113,6 +113,8 @@ public class ExtractArchive {
                     } catch (RarException e) {
                         logError(e, "error extraction the file");
                     }
+                    Log.d(LOG_TAG, "extracted: " + fileNameString);
+
                 } else {
                     try {
                         arch.extractFile(fh, nullOutputStream);

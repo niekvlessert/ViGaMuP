@@ -1,6 +1,5 @@
 package nl.vlessert.vigamup;
 
-import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -15,7 +14,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
 import android.media.session.MediaSession;
@@ -27,8 +25,6 @@ import android.os.IBinder;
 import android.os.SystemClock;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
-import android.view.LayoutInflater;
-import android.widget.ImageButton;
 import android.widget.RemoteViews;
 
 import java.io.File;
@@ -79,7 +75,7 @@ public class PlayerService extends Service{
     private int currentBigViewType = Constants.BIG_VIEW_TYPES.SQUARE;
 
     static {
-        System.loadLibrary("kss_player");
+        System.loadLibrary("player_engine");
     }
 
     @Override
@@ -506,7 +502,7 @@ public class PlayerService extends Service{
         Game game = gameCollection.getCurrentGame();
 
         File file = new File(game.imageFile.getAbsolutePath());
-                //trackListGameLogoView.setImageBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant));
+        //trackListGameLogoView.setImageBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.music_note_transparant));
 
         if (!currentLogoFile.equals(game.imageFile.getAbsolutePath())) {
             currentLogoFile = game.imageFile.getAbsolutePath();
@@ -592,7 +588,7 @@ public class PlayerService extends Service{
                     currentGame = gameCollection.getCurrentGame();
                     currentGame.setFirstTrack();
                     Log.d(LOG_TAG, "Game in service: " + currentGame.gameName);
-                    if (currentGame.getMusicType()==0) setKssJava(currentGame.musicFileC);
+                    //if (currentGame.getMusicType()==0) setKssJava(currentGame.musicFileC);
                 }
                 break;
             case Constants.REPEAT_MODES.LOOP_GAME:
@@ -610,7 +606,7 @@ public class PlayerService extends Service{
                 gameCollection.setCurrentGame(Integer.parseInt(gameAndTrackInfoArray[0]));
                 currentGame = gameCollection.getCurrentGame();
                 currentGame.setTrack(Integer.parseInt(gameAndTrackInfoArray[1]));
-                if (currentGame.getMusicType()==0) setKssJava(currentGame.musicFileC);
+                //if (currentGame.getMusicType()==0) setKssJava(currentGame.musicFileC);
                 Log.d(LOG_TAG,"gameAndTrackInfo: " + gameAndTrackInfo);
                 break;
         }
@@ -618,30 +614,22 @@ public class PlayerService extends Service{
         Log.d(LOG_TAG, "Randomizer: " + randomizer);
         Log.d(LOG_TAG, "getmusictype: " + currentGame.getMusicType());
 
+        secondsPlayedFromCurrentTrack = 0;
+        secondsBufferedFromCurrentTrack = 0;
+
         switch (currentGame.getMusicType()){
-            case 0:
-                setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
-                if (!paused) {
-                    alreadyPlaying = true;
-                    startKssPlayback();
-                }
-                break;
-            case 1:
-                secondsPlayedFromCurrentTrack = 0;
-                secondsBufferedFromCurrentTrack = 0;
+            case Constants.PLATFORM.SNES:
                 currentGame.extractCurrentSpcTrackfromRSN();
-                startSpcPlayback(currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackLength());
                 break;
-            case 2:
-                secondsPlayedFromCurrentTrack = 0;
-                secondsBufferedFromCurrentTrack = 0;
-                String track = currentGame.getCurrentTrackFileNameFullPath();
-                track = track.replace(";;;",",");
-                Log.d(LOG_TAG, "track to play: "+track);
+            case Constants.PLATFORM.VGM:
+                //String track = currentGame.getCurrentTrackFileNameFullPath();
+                //track = track.replace(";;;",",");
+                //Log.d(LOG_TAG, "track to play: "+track);
                 currentGame.extractCurrentVgmTrackfromZip();
-                startVgmPlayback(track, currentGame.getCurrentTrackLength());
                 break;
         }
+
+        playTrack(currentGame.getMusicType(), currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
 
         sendBroadcast(new Intent("resetSeekBar"));
         sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
@@ -661,7 +649,7 @@ public class PlayerService extends Service{
                     currentGame = gameCollection.getCurrentGame();
                     currentGame.setLastTrack();
                     Log.d(LOG_TAG, "Game in service: " + currentGame.title + " " + currentGame.position);
-                    if (currentGame.getMusicType()==0) setKssJava(currentGame.musicFileC);
+                    //if (currentGame.getMusicType()==0) setKssJava(currentGame.musicFileC);
                 }
                 break;
             case Constants.REPEAT_MODES.LOOP_GAME:
@@ -678,35 +666,30 @@ public class PlayerService extends Service{
                 gameCollection.setCurrentGame(Integer.parseInt(gameAndTrackInfoArray[0]));
                 currentGame = gameCollection.getCurrentGame();
                 currentGame.setTrack(Integer.parseInt(gameAndTrackInfoArray[1]));
-                if (currentGame.getMusicType()==0) setKssJava(currentGame.musicFileC);
+                //if (currentGame.getMusicType()==0) setKssJava(currentGame.musicFileC);
                 Log.d(LOG_TAG,"gameAndTrackInfo: " + gameAndTrackInfo);
                 break;
         }
 
+        secondsPlayedFromCurrentTrack = 0;
+        secondsBufferedFromCurrentTrack = 0;
+
         switch (currentGame.getMusicType()){
-            case 0:
-                setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
-                if (!paused) {
-                    alreadyPlaying = true;
-                    startKssPlayback();
-                }
-                break;
-            case 1:
-                secondsPlayedFromCurrentTrack = 0;
-                secondsBufferedFromCurrentTrack = 0;
+            case Constants.PLATFORM.SNES:
                 currentGame.extractCurrentSpcTrackfromRSN();
-                startSpcPlayback(currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackLength());
+                //startSpcPlayback(currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackLength());
                 break;
-            case 2:
-                secondsPlayedFromCurrentTrack = 0;
-                secondsBufferedFromCurrentTrack = 0;
-                String track = currentGame.getCurrentTrackFileNameFullPath();
-                track = track.replace(";;;",",");
-                Log.d(LOG_TAG, "track to play: "+track);
+            case Constants.PLATFORM.VGM:
+                //String track = currentGame.getCurrentTrackFileNameFullPath();
+                //track = track.replace(";;;",",");
+                //Log.d(LOG_TAG, "track to play: "+track);
                 currentGame.extractCurrentVgmTrackfromZip();
-                startVgmPlayback(track, currentGame.getCurrentTrackLength());
+                //startVgmPlayback(track, currentGame.getCurrentTrackLength());
+                //playTrack(currentGame.getMusicType(), track, 0, currentGame.getCurrentTrackLength());
                 break;
         }
+
+        playTrack(currentGame.getMusicType(), currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
 
         sendBroadcast(new Intent("resetSeekBar"));
         sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
@@ -717,47 +700,22 @@ public class PlayerService extends Service{
 
     public void playCurrentTrack() {
         Game game = gameCollection.getCurrentGame();
+
+        secondsPlayedFromCurrentTrack = 0;
+        secondsBufferedFromCurrentTrack = 0;
+
+        alreadyPlaying = true;
+
         switch (game.getMusicType()){
-            case 0:
-                setKssTrackJava(game.getCurrentTrackNumber(), game.getCurrentTrackLength());
-                startKssPlayback();
-                break;
-            case 1:
+            case Constants.PLATFORM.SNES:
                 game.extractCurrentSpcTrackfromRSN();
-                startSpcPlayback(game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackLength());
+                break;
+            case Constants.PLATFORM.VGM:
+                game.extractCurrentVgmTrackfromZip();
                 break;
         }
-        alreadyPlaying = true;
-        updateNotificationTitles();
-        updateA2DPInfo();
-        setPlayingStatePlaying();
-        if (paused) paused = togglePlayback();
-    }
 
-    public void playSpc(String fileName){
-        Game game = gameCollection.getCurrentGame();
-        secondsPlayedFromCurrentTrack = 0;
-        secondsBufferedFromCurrentTrack = 0;
-
-        //game.extractCurrentSpcTrackfromRSN();
-        startSpcPlayback(fileName, game.getCurrentTrackLength());
-
-        updateNotificationTitles();
-        updateA2DPInfo();
-        setPlayingStatePlaying();
-
-        if (paused) paused = togglePlayback();
-    }
-
-    public void playVgm(String fileName){
-        Game game = gameCollection.getCurrentGame();
-        secondsPlayedFromCurrentTrack = 0;
-        secondsBufferedFromCurrentTrack = 0;
-
-        //game.extractCurrentSpcTrackfromRSN();
-        fileName = fileName.replaceAll(";;;",",");
-        Log.d(LOG_TAG, "track to play: " + fileName);
-        startVgmPlayback(fileName, game.getCurrentTrackLength());
+        playTrack(game.getMusicType(), game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackNumber(), game.getCurrentTrackLength());
 
         updateNotificationTitles();
         updateA2DPInfo();
@@ -770,35 +728,6 @@ public class PlayerService extends Service{
         return gameCollection.getCurrentGame().getCurrentTrackLength();
     }
 
-    public void setKssJava(String file){
-        kssSet = true;
-        kssTrackSet = false;
-        if (!currentFile.equals(file)) {
-            Log.d(LOG_TAG,"setting new KSS: " + file);
-            setKss(file);
-            currentFile = file;
-        }
-    }
-
-    public void setKssTrackJava(int track, int length){
-        Log.d(LOG_TAG, "track: " + track + " length: " + length);
-        kssTrackSet = true;
-        secondsPlayedFromCurrentTrack = 0;
-        secondsBufferedFromCurrentTrack = 0;
-        //alreadyPlaying = false;
-        setKssTrack(track, length);
-    }
-
-    public void startPlayback(){
-        if (paused) {
-            togglePlayback();
-            updateA2DPInfo();
-            updateNotificationTitles();
-            setPlayingStatePlaying();
-            paused = false;
-        }
-    }
-
     public void stopPlayback(){
         if (!paused) {
             togglePlayback();
@@ -809,17 +738,6 @@ public class PlayerService extends Service{
     private void fixUninitialized(){
         if (!hasGameCollection) createGameCollection();
         currentGame = gameCollection.getCurrentGame();
-        switch (currentGame.getMusicType()) {
-            case 0:
-                if (!kssSet) {
-                    setKssJava(currentGame.musicFileC);
-                    setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
-                }
-                if (!kssTrackSet) {
-                    setKssTrackJava(currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
-                }
-                break;
-        }
     }
 
     public void togglePlaybackJava(){
@@ -835,14 +753,15 @@ public class PlayerService extends Service{
 
         if (!alreadyPlaying) {
             switch (game.getMusicType()){
-                case 0:
-                    startKssPlayback();
-                    break;
-                case 1:
+                case Constants.PLATFORM.SNES:
                     game.extractCurrentSpcTrackfromRSN();
-                    startSpcPlayback(game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackLength());
+                    //startSpcPlayback(game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackLength());
+                    break;
+                case Constants.PLATFORM.VGM:
+                    game.extractCurrentVgmTrackfromZip();
                     break;
             }
+            playTrack(game.getMusicType(), game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackNumber(), game.getCurrentTrackLength());
             alreadyPlaying = true;
         }
 
@@ -1025,7 +944,7 @@ public class PlayerService extends Service{
         }
     }
 
-    private void setBufferBarProgress() {
+    private void setBufferBarProgress() { // used from ndk..
         secondsBufferedFromCurrentTrack++;
         Intent intent = new Intent("setBufferBarProgress");
         intent.putExtra("BUFFERBAR_PROGRESS_SECONDS",secondsBufferedFromCurrentTrack);
@@ -1036,23 +955,22 @@ public class PlayerService extends Service{
         return secondsBufferedFromCurrentTrack;
     }
 
-    private void setSeekBarThumbProgress(){
+    private void setSeekBarThumbProgress(){ // used from ndk..
         secondsPlayedFromCurrentTrack++;
         Intent intent = new Intent("setSeekBarThumbProgress");
         intent.putExtra("SEEKBAR_PROGRESS_SECONDS",secondsPlayedFromCurrentTrack);
         sendBroadcast(intent);
     }
 
-    public void setKssProgressJava(int progress){
+    public void setProgressJava(int progress){
         secondsPlayedFromCurrentTrack = progress;
         updateA2DPPlayState(true);
-        setKssProgress(progress);
+        setProgress(progress);
     }
 
     public Game getCurrentGame(){
         return gameCollection.getCurrentGame();
     }
-
 
     public boolean getPaused(){
         return paused;
@@ -1060,16 +978,12 @@ public class PlayerService extends Service{
 
     public native void createEngine();
     public static native void createBufferQueueAudioPlayer(int sampleRate, int samplesPerBuf);
-    public static native void setKss(String file);
-    public static native void setKssTrack(int track, int length);
-    public static native void startKssPlayback();
-    public static native void startSpcPlayback(String fileName, int length);
-    public static native void startVgmPlayback(String fileName, int length);
+    public static native void playTrack(int musicType, String filename, int trackNr, int length);
     public static native boolean togglePlayback();
     public static native void pausePlayback();
     public static native void resumePlayback();
     public static native boolean toggleLoopTrack();
-    public native void setKssProgress(int progress);
+    public native void setProgress(int progress);
     public native void shutdown();
 
     public native void generateTrackInformation();
