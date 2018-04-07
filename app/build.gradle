@@ -1,14 +1,14 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 25
-    buildToolsVersion "25"
+    compileSdkVersion 27
+    buildToolsVersion '27.0.2'
     defaultConfig {
         applicationId "nl.vlessert.vigamup"
         minSdkVersion 19
-        targetSdkVersion 25
-        versionCode 3
-        versionName "1.2"
+        targetSdkVersion 27
+        versionCode 5
+        versionName "1.4"
         multiDexEnabled true
         externalNativeBuild {
             cmake {
@@ -17,8 +17,8 @@ android {
         }
     }
     packagingOptions {
-        pickFirst  'META-INF/LICENSE'
-        pickFirst  'META-INF/DEPENDENCIES'
+        pickFirst 'META-INF/LICENSE'
+        pickFirst 'META-INF/DEPENDENCIES'
     }
     buildTypes {
         release {
@@ -31,6 +31,11 @@ android {
             path "CMakeLists.txt"
         }
     }
+
+    dexOptions {
+        preDexLibraries = false
+    }
+
     defaultConfig {
         ndk {
             abiFilters "armeabi", "armeabi-v7a", "x86"
@@ -39,15 +44,18 @@ android {
 }
 
 dependencies {
-    compile fileTree(include: ['*.jar'], dir: 'libs')
-    compile 'com.android.support:appcompat-v7:25.3.1'
-    compile 'com.android.support:design:25.3.1'
+    //compile fileTree(include: ['*.jar'], dir: 'libs')
+    implementation 'com.android.support.constraint:constraint-layout:1.0.2'
+    compile 'com.android.support:appcompat-v7:27.1.0'
+    compile 'com.android.support:design:27.1.0'
     compile 'com.google.zxing:core:3.2.1'
-    compile 'com.journeyapps:zxing-android-embedded:3.2.0@aar'
+    compile 'com.journeyapps:zxing-android-embedded:3.4.0@aar'
     //compile 'com.google.android.gms:play-services-vision:10.2.1'
-    compile 'com.github.junrar:junrar:0.7'
+    compile 'com.github.ghost1372:Mzip-Android:0.4.0'
+    compile 'com.nostra13.universalimageloader:universal-image-loader:1.9.5'
     repositories {
         mavenCentral()
+        maven { url 'https://jitpack.io' }
     }
     compile 'com.sothree.slidinguppanel:library:3.3.1'
     compile 'me.grantland:autofittextview:0.2.+'

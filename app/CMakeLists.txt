@@ -10,7 +10,7 @@ cmake_minimum_required(VERSION 3.4.1)
 # Gradle automatically packages shared libraries with your APK.
 
 add_library( # Sets the name of the library.
-             kss_player
+             player_engine
 
              # Sets the library as a shared library.
              SHARED
@@ -18,7 +18,7 @@ add_library( # Sets the name of the library.
              # Provides a relative path to your source file(s).
              # Associated headers in the same location as their source
              # file are automatically included.
-             src/main/cpp/kss_player.c )
+             src/main/cpp/player_engine.c )
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because system libraries are included in the search path by
@@ -42,7 +42,7 @@ add_subdirectory(src/main/cpp/game-music-emu-0.6.0)
 add_subdirectory(src/main/cpp/vgmplay)
 
 # Include libraries needed for native-audio-jni lib
-target_link_libraries(kss_player
+target_link_libraries(player_engine
                       gme
                       android
                       log

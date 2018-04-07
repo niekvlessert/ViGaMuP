@@ -45,5 +45,8 @@ public class GameTrack {
         return position;
     }
 
-    public String getFileName() { return fileName; }
+    public String getFileName() {
+        fileName = fileName.replace(";;;",","); // Ugly workaround for avoiding issues with , in fileName and csv entries... VGM trackinfo has this.
+        return fileName;
+    }
 }

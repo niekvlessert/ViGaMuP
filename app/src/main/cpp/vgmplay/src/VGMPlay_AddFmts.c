@@ -20,9 +20,8 @@ void __stdcall Sleep(unsigned int dwMilliseconds);
 
 #include "VGMPlay.h"
 
-#include "VGMFile.h"
-
 #include "ChipMapper.h"
+#include "VGMFile.h"
 
 // Structures for DRO and CMF files
 typedef struct _cmf_file_header

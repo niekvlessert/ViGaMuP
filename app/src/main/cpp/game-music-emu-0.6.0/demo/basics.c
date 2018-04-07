@@ -2,7 +2,7 @@
 
 static char filename [] = "test.nsf"; /* opens this file (can be any music type) */
 
-#include "gme/gme.h"
+#include "../gme/gme.h"
 
 #include "Wave_Writer.h" /* wave_ functions for writing sound file */
 #include <stdlib.h>

@@ -1,6 +1,7 @@
 package nl.vlessert.vigamup;
 
 import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -398,7 +399,7 @@ public class PlayerService extends Service{
 
         bigViews.setTextViewText(R.id.status_bar_album_name, "");
 
-        mNotificationCompatBuilder = new NotificationCompat.Builder(this)
+        mNotificationCompatBuilder = new NotificationCompat.Builder(this, "nl.vlessert.vigamup.PlayerService")
                 .setContentTitle("")
                 .setTicker("")
                 .setContentText("")
@@ -588,7 +589,6 @@ public class PlayerService extends Service{
                     currentGame = gameCollection.getCurrentGame();
                     currentGame.setFirstTrack();
                     Log.d(LOG_TAG, "Game in service: " + currentGame.gameName);
-                    //if (currentGame.getMusicType()==0) setKssJava(currentGame.musicFileC);
                 }
                 break;
             case Constants.REPEAT_MODES.LOOP_GAME:
@@ -618,13 +618,10 @@ public class PlayerService extends Service{
         secondsBufferedFromCurrentTrack = 0;
 
         switch (currentGame.getMusicType()){
-            case Constants.PLATFORM.SNES:
+            case Constants.PLATFORM.SPC:
                 currentGame.extractCurrentSpcTrackfromRSN();
                 break;
             case Constants.PLATFORM.VGM:
-                //String track = currentGame.getCurrentTrackFileNameFullPath();
-                //track = track.replace(";;;",",");
-                //Log.d(LOG_TAG, "track to play: "+track);
                 currentGame.extractCurrentVgmTrackfromZip();
                 break;
         }
@@ -649,7 +646,6 @@ public class PlayerService extends Service{
                     currentGame = gameCollection.getCurrentGame();
                     currentGame.setLastTrack();
                     Log.d(LOG_TAG, "Game in service: " + currentGame.title + " " + currentGame.position);
-                    //if (currentGame.getMusicType()==0) setKssJava(currentGame.musicFileC);
                 }
                 break;
             case Constants.REPEAT_MODES.LOOP_GAME:
@@ -675,17 +671,11 @@ public class PlayerService extends Service{
         secondsBufferedFromCurrentTrack = 0;
 
         switch (currentGame.getMusicType()){
-            case Constants.PLATFORM.SNES:
+            case Constants.PLATFORM.SPC:
                 currentGame.extractCurrentSpcTrackfromRSN();
-                //startSpcPlayback(currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackLength());
                 break;
             case Constants.PLATFORM.VGM:
-                //String track = currentGame.getCurrentTrackFileNameFullPath();
-                //track = track.replace(";;;",",");
-                //Log.d(LOG_TAG, "track to play: "+track);
                 currentGame.extractCurrentVgmTrackfromZip();
-                //startVgmPlayback(track, currentGame.getCurrentTrackLength());
-                //playTrack(currentGame.getMusicType(), track, 0, currentGame.getCurrentTrackLength());
                 break;
         }
 
@@ -707,14 +697,14 @@ public class PlayerService extends Service{
         alreadyPlaying = true;
 
         switch (game.getMusicType()){
-            case Constants.PLATFORM.SNES:
+            case Constants.PLATFORM.SPC:
                 game.extractCurrentSpcTrackfromRSN();
                 break;
             case Constants.PLATFORM.VGM:
                 game.extractCurrentVgmTrackfromZip();
                 break;
         }
-
+        Log.d(LOG_TAG,"info: " + game.getMusicType()+" "+game.getCurrentTrackFileNameFullPath()+" "+game.getCurrentTrackNumber()+" "+game.getCurrentTrackLength());
         playTrack(game.getMusicType(), game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackNumber(), game.getCurrentTrackLength());
 
         updateNotificationTitles();
@@ -753,7 +743,7 @@ public class PlayerService extends Service{
 
         if (!alreadyPlaying) {
             switch (game.getMusicType()){
-                case Constants.PLATFORM.SNES:
+                case Constants.PLATFORM.SPC:
                     game.extractCurrentSpcTrackfromRSN();
                     //startSpcPlayback(game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackLength());
                     break;

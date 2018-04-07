@@ -1,22 +1,14 @@
 package nl.vlessert.vigamup;
 
 import android.content.Context;
-import android.content.IntentFilter;
 import android.os.Environment;
 import android.util.Log;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.BaseAdapter;
-import android.widget.TextView;
 
 import java.io.File;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.TreeSet;
 
 public class GameCollection{
     private int activeGame = 0;
@@ -53,14 +45,14 @@ public class GameCollection{
             for (File file : files) {
                 if (file.getName().endsWith(".kss")) {
                     strings = file.getName().split("\\.");
-                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.MSX, ctx, 0));
+                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.KSS, ctx, 0));
                     position++;
                 }
             }
         }
         if (position>0) {
-            Log.d(LOG_TAG,"foundMusicTypes.add(Constants.PLATFORM.MSX");
-            foundMusicTypes.add(Constants.PLATFORM.MSX);
+            Log.d(LOG_TAG,"foundMusicTypes.add(Constants.PLATFORM.KSS");
+            foundMusicTypes.add(Constants.PLATFORM.KSS);
         }
         int storedPosition = position;
         parentDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/SPC/");
@@ -69,14 +61,14 @@ public class GameCollection{
             for (File file : files) {
                 if (file.getName().endsWith(".rsn")) {
                     strings = file.getName().split("\\.");
-                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.SNES, ctx, 0));
+                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.SPC, ctx, 0));
                     position++;
                 }
             }
         }
         if (position>storedPosition) {
-            Log.d(LOG_TAG,"foundMusicTypes.add(Constants.PLATFORM.SNES");
-            foundMusicTypes.add(Constants.PLATFORM.SNES);
+            Log.d(LOG_TAG,"foundMusicTypes.add(Constants.PLATFORM.SPC");
+            foundMusicTypes.add(Constants.PLATFORM.SPC);
         }
 
         storedPosition = position;
@@ -94,6 +86,24 @@ public class GameCollection{
         if (position>storedPosition) {
             Log.d(LOG_TAG,"foundMusicTypes.add(Constants.PLATFORM.VGM");
             foundMusicTypes.add(Constants.PLATFORM.VGM);
+        }
+
+        storedPosition = position;
+        parentDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/Other/");
+        files = parentDir.listFiles();
+        if (files!=null) {
+            for (File file : files) {
+                if (file.getName().endsWith(".nsf")) {
+                    strings = file.getName().split("\\.");
+                    Log.d(LOG_TAG, "Adding: "+ strings[0]);
+                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.NSF, ctx, 0));
+                    position++;
+                }
+            }
+        }
+        if (position>storedPosition) {
+            Log.d(LOG_TAG,"foundMusicTypes.add(Constants.PLATFORM.OTHERS");
+            foundMusicTypes.add(Constants.PLATFORM.OTHERS);
         }
 
         gameObjectsWithTrackInformation = new ArrayList<>();

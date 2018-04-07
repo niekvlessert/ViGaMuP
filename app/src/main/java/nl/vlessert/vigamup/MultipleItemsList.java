@@ -26,16 +26,20 @@ public class MultipleItemsList extends ListFragment {
         View v = inflater.inflate(R.layout.gamelist_fragment, container, false);
 
         Bundle b = getArguments();
+
         //gameCollection = new GameCollection(getActivity().getApplicationContext(), (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE));
         //gameCollection.createGameCollection(b.getInt("PlatformAndType"));
         //gameCollection.createGameCollection();
-        gameCollection = ((MainActivity)getActivity()).getGameCollection();
-        GameCollectionShowPerPlatform gc = new GameCollectionShowPerPlatform();
-        gc.setAdapterStuff(getActivity().getApplicationContext(), (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE));
         //gameCollection.setAdapterStuff(getActivity().getApplicationContext(), (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE));
-        gc.addGamesFromPlatform(gameCollection, b.getInt("PlatformAndType"));
         //gameCollection.setMusicTypeToDisplay(b.getInt("PlatformAndType"));
         //setListAdapter(gameCollection);
+
+        gameCollection = ((MainActivity)getActivity()).getGameCollection();
+
+        GameCollectionShowPerPlatform gc = new GameCollectionShowPerPlatform();
+        gc.setAdapterStuff(getActivity().getApplicationContext(), (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE));
+        gc.addGamesFromPlatform(gameCollection, b.getInt("PlatformAndType"));
+
         setListAdapter(gc);
         return v;
     }
@@ -43,16 +47,19 @@ public class MultipleItemsList extends ListFragment {
     @Override
     public void onListItemClick(ListView l, View v, int position, long id) {
         Game game = ((Game)getListAdapter().getItem(position));
-        if (game.hasTrackInformationAvailable()) {
-            ((MainActivity) getActivity()).gameClicked(gameCollection.getGameObjectsWithTrackInformation().indexOf(game));
-        } else {
-            Toast.makeText((getActivity()), "This game has no track information... please add it, look at vigamup.tk for more information.", Toast.LENGTH_LONG).show();
+        if (game.isGame()) {
+            if (game.hasTrackInformationAvailable()) {
+                ((MainActivity) getActivity()).gameClicked(gameCollection.getGameObjectsWithTrackInformation().indexOf(game));
+            } else {
+                Toast.makeText((getActivity()), "This game has no track information... please add it, look at vigamup.club for more information.", Toast.LENGTH_LONG).show();
+            }
         }
     }
 
     public static class ViewHolder {
         public TextView textView;
         public TextView textView2;
+        public TextView textView3;
     }
 
     public static MultipleItemsList newInstance(int platformAndType) {
@@ -68,14 +75,22 @@ public class MultipleItemsList extends ListFragment {
 
     public class GameCollectionShowPerPlatform extends BaseAdapter {
         private ArrayList<Game> gameObjects = new ArrayList<>();
-        private int musicTypeToDisplay;
         private static final int NO_TRACK_INFORMATION = 0;
         private static final int TRACK_INFORMATION = 1;
+        private static final int GAME_LIST_MENU_ITEM = 2;
         private LayoutInflater mInflater;
         private Context ctx;
 
-        public void addGamesFromPlatform(GameCollection gameCollection, int platform){
-            musicTypeToDisplay = platform;
+        private void addGamesFromPlatform(GameCollection gameCollection, int platform){
+
+            // insert / append gameListMenuItems for every platform type
+            GameListMenuItem item = new GameListMenuItem("header", platform, ctx, 0);
+            ArrayList<Integer> foundMusicTypes = gameCollection.getFoundMusicTypes();
+            if (foundMusicTypes.indexOf(platform)>0) item.setMorePlatformsBefore();
+            if (foundMusicTypes.indexOf(platform)+1<foundMusicTypes.size()) item.setMorePlatformsAfter();
+            //Log.d(LOG_TAG, "foundMusicTypes.indexOf(platform): "+foundMusicTypes.indexOf(platform) + " foundMusicTypes.size(): " + foundMusicTypes.size());
+
+            gameObjects.add(item);
 
             for (Game game: gameCollection.getGameObjects()){
                 if (game.getMusicType()==platform) {
@@ -83,6 +98,8 @@ public class MultipleItemsList extends ListFragment {
                 }
             }
             Log.d(LOG_TAG,"gameObjects size: " + gameObjects.size());
+
+            // head
         }
 
         public void setAdapterStuff(Context ctx, LayoutInflater layoutInflater){
@@ -102,7 +119,7 @@ public class MultipleItemsList extends ListFragment {
 
         @Override
         public int getViewTypeCount() {
-            return 2;
+            return 3;
         }
 
         @Override
@@ -112,6 +129,8 @@ public class MultipleItemsList extends ListFragment {
 
         @Override
         public int getItemViewType(int position) {
+            if (!gameObjects.get(position).isGame()) return GAME_LIST_MENU_ITEM;
+
             return gameObjects.get(position).hasTrackInformationList() ? TRACK_INFORMATION : NO_TRACK_INFORMATION;
         }
 
@@ -119,12 +138,44 @@ public class MultipleItemsList extends ListFragment {
         public View getView(int position, View convertView, ViewGroup parent) {
             MultipleItemsList.ViewHolder holder;
             int type = getItemViewType(position);
+
+            if (type==GAME_LIST_MENU_ITEM) {
+                holder = new MultipleItemsList.ViewHolder();
+                GameListMenuItem item = (GameListMenuItem) gameObjects.get(position);
+                boolean hasMorePlatFormsAfter = item.getMorePlatformsAfter();
+                boolean hasMorePlatFormsBefore = item.getMorePlatformsBefore();
+                convertView = mInflater.inflate(R.layout.gamelist_menu_item,null);
+                holder.textView = convertView.findViewById(R.id.previous);
+                holder.textView2 = convertView.findViewById(R.id.type);
+                holder.textView3 = convertView.findViewById(R.id.next);
+                int platform = gameObjects.get(position).getMusicType();
+                if (hasMorePlatFormsBefore) holder.textView.setText("<");
+                if (hasMorePlatFormsAfter) holder.textView3.setText(">");
+                switch (platform) {
+                    case Constants.PLATFORM.KSS:
+                        holder.textView2.setText("KSS");
+                        break;
+                    case Constants.PLATFORM.SPC:
+                        holder.textView2.setText("SPC");
+                        break;
+                    case Constants.PLATFORM.VGM:
+                        holder.textView2.setText("VGM");
+                        break;
+                    case Constants.PLATFORM.OTHERS:
+                        holder.textView2.setText("Other platforms");
+                        break;
+                }
+                //holder.textView2.setText("tekst");
+                convertView.setTag(holder);
+                return convertView;
+            }
+
             if (convertView == null) {
                 holder = new MultipleItemsList.ViewHolder();
                 convertView = mInflater.inflate(R.layout.gamelist_item, null);
 
-                holder.textView = (TextView)convertView.findViewById(R.id.text);
-                holder.textView2 = (TextView)convertView.findViewById(R.id.text2);
+                holder.textView = convertView.findViewById(R.id.text);
+                holder.textView2 = convertView.findViewById(R.id.text2);
 
                 convertView.setTag(holder);
             } else {
@@ -148,6 +199,15 @@ public class MultipleItemsList extends ListFragment {
                     if (gameObjects.get(position).getVendorAndYear().length()>0) {
                         information = information.concat("\n"+gameObjects.get(position).getVendorAndYear());
                         //holder2.textView.setHeight(300);
+                    } else {
+                        int musicType = gameObjects.get(position).getMusicType();
+                        if (musicType>2) {
+                            if (musicType == Constants.PLATFORM.NSF) {
+                                information = information.concat("\nNSF format, NES");
+                                String composers = gameObjects.get(position).getComposers();
+                                if (composers.length()>0) information = information.concat("\n"+ composers);
+                            }
+                        }
                     }
                     holder.textView2.setText(information);
 

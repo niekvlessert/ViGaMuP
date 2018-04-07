@@ -11,10 +11,10 @@ typedef unsigned short						UINT16;
 typedef signed short						INT16;
 
 /* 32-bit values */
-//#ifndef _WINDOWS_H
+#ifndef _WINDOWS_H
 typedef unsigned int						UINT32;
 typedef signed int							INT32;
-//#endif
+#endif
 
 /* 64-bit values */
 #ifndef _WINDOWS_H

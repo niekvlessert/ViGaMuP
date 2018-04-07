@@ -10,13 +10,16 @@
 # (notice that you can just pass these as arguments when running make)
 
 # set to 1 if you build on Windows using MinGW.
+
+MACOSX_DEPLOYMENT_TARGET = 10.9
+
 ifndef WINDOWS
 WINDOWS = 0
 endif
 
 # set to 1 if you build on Mac OSX
 ifndef MACOSX
-MACOSX = 0
+MACOSX = 1
 endif
 
 ifeq ($(WINDOWS), 1)
@@ -120,7 +123,7 @@ ifeq ($(MACOSX), 1)
 #CFLAGS += -I/some/path
 else
 # for Linux, add librt (clock stuff) and libpthread (threads)
-LDFLAGS += -lpthread -pthread
+LDFLAGS += -lrt -lpthread -pthread
 endif
 MAINFLAGS += -pthread -DSHARE_PREFIX=\"$(PREFIX)\"
 endif
@@ -213,6 +216,7 @@ EMUOBJS = \
 	$(EMUOBJ)/ym2151.o \
 	$(EMUOBJ)/ym2413.o \
 	$(EMUOBJ)/ym2612.o \
+	$(EMUOBJ)/ym3438.o \
 	$(EMUOBJ)/ymdeltat.o \
 	$(EMUOBJ)/ymf262.o \
 	$(EMUOBJ)/ymf271.o \
@@ -231,7 +235,7 @@ VGM2WAV_OBJS = \
 EXTRA_OBJS = $(VGMPLAY_OBJS) $(VGM2PCM_OBJS) $(VGM2WAV_OBJS)
 
 
-all:	vgmplay
+all:	vgmplay vgm2pcm vgm2wav
 
 vgmplay:	$(EMUOBJS) $(MAINOBJS) $(VGMPLAY_OBJS)
 	@echo Linking vgmplay ...

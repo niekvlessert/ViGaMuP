@@ -1,12 +1,14 @@
 cmake_minimum_required(VERSION 2.8.9)
 
-add_definitions(-DDISABLE_HWOPL_SUPPORT=1)
+#add_definitions(-DDISABLE_HWOPL_SUPPORT=1)
 add_definitions(-DDISABLE_HW_SUPPORT)
-add_definitions(-DUSE_LIBAO)
-add_definitions(-DDEBUG=0)
-add_definitions(-DBYTE_ORDER=1)
-add_definitions(-DVGM_LITTLE_ENDIAN)
-add_definitions(-DCONSOLE_MODE=0 -DADDITIONAL_FORMATS -DSET_CONSOLE_TITLE -DENABLE_ALL_CORES)
+#add_definitions(-DUSE_LIBAO)
+#add_definitions(-DDEBUG=0)
+#add_definitions(-DBYTE_ORDER=1)
+#add_definitions(-DVGM_LITTLE_ENDIAN)
+#add_definitions(-DCONSOLE_MODE=0 -DADDITIONAL_FORMATS -DSET_CONSOLE_TITLE -DENABLE_ALL_CORES)
+#add_definitions(-DADDITIONAL_FORMATS -DSET_CONSOLE_TITLE -DENABLE_ALL_CORES)
+
 
 file(GLOB_RECURSE Foo_HEADERS "src/*.h")
 
@@ -32,5 +34,5 @@ list(REMOVE_ITEM SOURCES "${PROJECT_SOURCE_DIR}/src/main/cpp/vgmplay/src/chips/s
 add_library(vgmplay STATIC ${SOURCES})
 target_link_libraries(vgmplay z m)
 
-add_executable(vgmplay_ui EXCLUDE_FROM_ALL src/VGMPlayUI.c)
-target_link_libraries(vgmplay_ui vgmplay)
+#add_executable(vgmplay_ui EXCLUDE_FROM_ALL src/VGMPlayUI.c)
+#target_link_libraries(vgmplay_ui vgmplay)

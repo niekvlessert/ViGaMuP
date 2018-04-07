@@ -4,6 +4,8 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.DownloadManager;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -28,6 +30,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentStatePagerAdapter;
+import android.support.v4.app.FragmentTransaction;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AlertDialog;
@@ -158,6 +161,15 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
         startIntent.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
         startService(startIntent);
         bindService(startIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
+
+        String NOTIFICATION_CHANNEL_ID_SERVICE = "nl.vlessert.vigamup.PlayerService";
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                NotificationChannel nc = new NotificationChannel(NOTIFICATION_CHANNEL_ID_SERVICE, "App Service", NotificationManager.IMPORTANCE_LOW);
+                nc.setSound(null,null);
+                nm.createNotificationChannel(nc);
+            }
 
         mLayout = (SlidingUpPanelLayout) findViewById(R.id.sliding_layout);
         mLayout.addPanelSlideListener(new SlidingUpPanelLayout.PanelSlideListener() {
@@ -366,9 +378,9 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
         Log.d(LOG_TAG,"onResume!!");
         registerReceiver(receiver, filter);
         if (!firstRun) {
-            Log.d(LOG_TAG,"na !firstrun");
+            //Log.d(LOG_TAG,"na !firstrun");
             if (checkForMusicAndInitialize()) {
-                Log.d(LOG_TAG,"na checkForMusicAndInitialize" + mServiceBound);
+                //Log.d(LOG_TAG,"na checkForMusicAndInitialize" + mServiceBound);
                 if (mServiceBound) {
                     if (rebuildMusicList) {
                         rebuildMusicList = false;
@@ -391,7 +403,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     seekBarThumbProgress = 0;
                     seekBar.setProgress(0);
                     seekBar.setSecondaryProgress(mPlayerService.getBufferBarProgress() + 2);
-                    Log.d(LOG_TAG, "Game in onresume: " + game.title + " " + game.position);
+                    //Log.d(LOG_TAG, "Game in onresume: " + game.title + " " + game.position);
                     if (!mPlayerService.getPaused()) {
                         if (!game.getTitle().equals(currentShowedGameTitle)) showGame(-1);
                     }
@@ -462,14 +474,14 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                 showMusicList();
             }
             if (!mPlayerService.isPaused()) {
-                Log.d(LOG_TAG,"playing from onserviceconnected and service not paused!!");
+                //Log.d(LOG_TAG,"playing from onserviceconnected and service not paused!!");
                 //Game game = gameCollection.getCurrentGame();
                 Game game = mPlayerService.getCurrentGame();
                 seekBar.setMax(game.getCurrentTrackLength());
                 bufferBarProgress = 2; // 2 seconds buffered always in advance...
                 seekBarThumbProgress = 0;
                 seekBar.setProgress(0);
-                Log.d(LOG_TAG, "Game in activity: " + game.title + " " + game.position);
+                //Log.d(LOG_TAG, "Game in activity: " + game.title + " " + game.position);
                 initialized = true;
                 setPlayButtonInPlayerBar();
                 setTrackInfoInPlayerBar();
@@ -497,9 +509,12 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
             case R.id.download_music:
                 downloadMusic();
                 return true;
+            case R.id.download_vgmrips:
+                downloadVGMRips();
+                return true;
             case R.id.about:
                 AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                builder.setMessage("ViGaMuP by Niek Vlessert. Many thanks to Okaxaki and Blargg for their amazing libraries, to the msx.org community for giving me tips and info and to snesmusic.org for their great collection.")
+                builder.setMessage("ViGaMuP by Niek Vlessert. Many thanks to Okaxaki, Blargg and ValleyBell for their amazing libraries, to the msx.org & vgmrips community for giving me tips and info.")
                         .setCancelable(false)
                         .setPositiveButton("OK", new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int id) {
@@ -1050,7 +1065,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
         String message = "";
         if (firstRun) message = "You don't have any music! ";
-        message += "Visit vigamup.tk with your PC to get some QR codes to get yourself some music! Click OK to open the QR code scanner...";
+        message += "Visit vigamup.club with your PC to get some QR codes to get yourself some music! Click OK to open the QR code scanner...";
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setMessage(message)
                 .setCancelable(false)
@@ -1070,6 +1085,11 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
         AlertDialog alert = builder.create();
 
         alert.show();
+    }
+
+    private void downloadVGMRips(){
+        Intent intent = new Intent(this, VGMRipsDownloaderActivity.class);
+        startActivity(intent);
     }
 
     public static void increaseClickArea(View parent, View child) {
@@ -1110,8 +1130,8 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
     private void setSeekBarThumbProgress(int seekBarThumbProgress){
         this.seekBarThumbProgress = seekBarThumbProgress;
-        Log.d(LOG_TAG,"seek bar should be set to " + seekBarThumbProgress);
-        Log.d(LOG_TAG,"max size = " + seekBar.getMax());
+        //Log.d(LOG_TAG,"seek bar should be set to " + seekBarThumbProgress);
+        //Log.d(LOG_TAG,"max size = " + seekBar.getMax());
         seekBar.setProgress(seekBarThumbProgress);
     }
 
@@ -1150,9 +1170,9 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
             return MultipleItemsList.newInstance(foundMusicTypes.get(pos));
             /*switch (pos) {
                 case 0:
-                    return MultipleItemsList.newInstance(Constants.PLATFORM.MSX);
+                    return MultipleItemsList.newInstance(Constants.PLATFORM.KSS);
                 default:
-                    return MultipleItemsList.newInstance(Constants.PLATFORM.SNES);
+                    return MultipleItemsList.newInstance(Constants.PLATFORM.SPC);
                 default:
                     return MultipleItemsList.newInstance(Constants.PLATFORM.PC_DEMO_SCENE);
             }*/

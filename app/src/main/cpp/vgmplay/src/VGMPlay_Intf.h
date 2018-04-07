@@ -2,7 +2,6 @@
 //
 
 //#define NO_WCHAR_FILENAMES
-
 #include "chips/mamedef.h"
 #include "stdbool.h"
 #include "VGMFile.h"
@@ -14,7 +13,7 @@
 
 typedef struct waveform_16bit_stereo
 {
-    INT16 Left;
+	INT16 Left;
 	INT16 Right;
 } WAVE_16BS;
 

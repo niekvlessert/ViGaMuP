@@ -110,7 +110,7 @@ static void PrintMinSec(UINT32 SamplePos, UINT32 SmplRate);
 
 
 // Options Variables
-extern UINT32 SampleRate;	// Note: also used by some sound cores to
+UINT32 SampleRate;	// Note: also used by some sound cores to
 							//       determinate the chip sample rate
 
 extern UINT32 VGMPbRate;
@@ -144,6 +144,7 @@ extern bool FMForce;
 //extern bool FMAccurate;
 extern bool FMBreakFade;
 extern float FMVol;
+extern bool FMOPL2Pan;
 
 extern CHIPS_OPTION ChipOpts[0x02];
 
@@ -768,7 +769,9 @@ static void cls(void)
 	// put the cursor at (0, 0)
 	bSuccess = SetConsoleCursorPosition(hConsole, coordScreen);
 #else
-	system("clear");
+	int retVal;
+	
+	retVal = system("clear");
 #endif
 	
 	return;
@@ -1171,6 +1174,10 @@ static void ReadOptions(const char* AppName)
 				{
 					FMVol = (float)strtod(RStr, NULL);
 				}
+				else if (! stricmp_u(LStr, "FMOPL2Pan"))
+				{
+					FMOPL2Pan = GetBoolFromStr(RStr);
+				}
 				/*else if (! stricmp_u(LStr, "AccurateFM"))
 				{
 					FMAccurate = GetBoolFromStr(RStr);
@@ -1283,6 +1290,12 @@ static void ReadOptions(const char* AppName)
 							TempFlag = GetBoolFromStr(RStr);
 							TempCOpt->SpecialFlags &= ~(0x01 << 2);
 							TempCOpt->SpecialFlags |= TempFlag << 2;
+						}
+						else if (! stricmp_u(LStr, "NukedType"))
+						{
+							TempLng = (UINT32)strtoul(RStr, NULL, 0) & 0x03;
+							TempCOpt->SpecialFlags &= ~(0x03 << 3);
+							TempCOpt->SpecialFlags |= TempLng << 3;
 						}
 						break;
 					//case 0x03:	// YM2151

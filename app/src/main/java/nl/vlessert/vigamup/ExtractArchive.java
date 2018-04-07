@@ -6,11 +6,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.logging.Logger;
 
-import com.github.junrar.Archive;
-import com.github.junrar.exception.RarException;
-import com.github.junrar.rarfile.FileHeader;
+import ir.mahdi.mzip.rar.Archive;
+import ir.mahdi.mzip.rar.exception.RarException;
+import ir.mahdi.mzip.rar.rarfile.FileHeader;
 
 /**
  * extract an archive to the given location

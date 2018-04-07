@@ -14,4 +14,4 @@ add_custom_command(TARGET demo
     COMMENT "Add convenience copy of test.nsf file for demo application"
     VERBATIM) # VERBATIM is essentially required, "please use correct command line kthx"
 
-target_link_libraries(demo gme)
+#target_link_libraries(demo gme)

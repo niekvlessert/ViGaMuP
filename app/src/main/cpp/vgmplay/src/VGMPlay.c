@@ -287,11 +287,9 @@ UINT64 TimeSpec2Int64(const struct timespec* ts);
 void* PlayingThread(void* Arg);
 #endif
 
-UINT8 CmdList[0x100]; // used by VGMPlay.c and VGMPlay_AddFmts.c
-bool ErrorHappened;   // used by VGMPlay.c and VGMPlay_AddFmts.c
 
 // Options Variables
-extern UINT32 SampleRate;	// Note: also used by some sound cores to determinate the chip sample rate
+UINT32 SampleRate;	// Note: also used by some sound cores to determinate the chip sample rate
 
 UINT32 VGMMaxLoop;
 UINT32 VGMPbRate;	// in Hz, ignored if this value or VGM's lngRate Header value is 0
@@ -319,6 +317,7 @@ bool FMForce;
 //bool FMAccurate;
 bool FMBreakFade;
 float FMVol;
+bool FMOPL2Pan;
 
 CHIPS_OPTION ChipOpts[0x02];
 
@@ -432,7 +431,7 @@ void VGMPlay_Init(void)
 	CHIP_OPTS* TempCOpt;
 	CAUD_ATTR* TempCAud;
 	
-	//SampleRate = 48000;
+	//SampleRate = 44100;
 	FadeTime = 5000;
 	PauseTime = 0;
 	
@@ -445,6 +444,7 @@ void VGMPlay_Init(void)
 	//FMAccurate = false;
 	FMBreakFade = false;
 	FMVol = 0.0f;
+	FMOPL2Pan = false;
 	SurroundSound = false;
 	VGMMaxLoop = 0x02;
 	VGMPbRate = 0;
@@ -1042,7 +1042,7 @@ void PlayVGM(void)
 			return;
 		}
 #ifdef CONSOLE_MODE
-		//PauseStream(true);
+		PauseStream(true);
 #endif
 		break;
 	case 0x02:	// like Mode 0x00, but Hardware is also controlled (not synced)
@@ -1131,7 +1131,7 @@ void PauseVGM(bool Pause)
 		{
 		case 0x00:
 #ifdef CONSOLE_MODE
-			//PauseStream(Pause);
+			PauseStream(Pause);
 #endif
 			break;
 		case 0x01:
@@ -1140,7 +1140,7 @@ void PauseVGM(bool Pause)
 			break;
 		case 0x02:
 #ifdef CONSOLE_MODE
-			//PauseStream(Pause);
+			PauseStream(Pause);
 #endif
 			SetMuteControl(Pause);
 			break;
@@ -2056,7 +2056,7 @@ const char* GetChipName(UINT8 ChipID)
 	const char* CHIP_STRS[CHIP_COUNT] = 
 	{	"SN76496", "YM2413", "YM2612", "YM2151", "SegaPCM", "RF5C68", "YM2203", "YM2608",
 		"YM2610", "YM3812", "YM3526", "Y8950", "YMF262", "YMF278B", "YMF271", "YMZ280B",
-		"RF5C164", "PWM", "AY8910", "GameBoy", "NES APU", "MultiPCM", "uPD7759", "OKIM6258",
+		"RF5C164", "PWM", "AY8910", "GameBoy", "NES APU", "YMW258", "uPD7759", "OKIM6258",
 		"OKIM6295", "K051649", "K054539", "HuC6280", "C140", "K053260", "Pokey", "QSound",
 		"SCSP", "WSwan", "VSU", "SAA1099", "ES5503", "ES5506", "X1-010", "C352",
 		"GA20"};
@@ -2128,6 +2128,12 @@ const char* GetAccurateChipName(UINT8 ChipID, UINT8 SubType)
 	case 0x01:
 		if (ChipID & 0x80)
 			RetStr = "VRC7";
+		break;
+	case 0x02:
+		if (! (ChipID & 0x80))
+			RetStr = "YM2612";
+		else
+			RetStr = "YM3438";
 		break;
 	case 0x04:
 		RetStr = "Sega PCM";
@@ -2279,6 +2285,7 @@ UINT32 GetChipClock(VGM_HEADER* FileHead, UINT8 ChipID, UINT8* RetSubType)
 		break;
 	case 0x02:
 		Clock = FileHead->lngHzYM2612;
+		AllowBit31 = 0x01;	// YM3438 Mode
 		break;
 	case 0x03:
 		Clock = FileHead->lngHzYM2151;
@@ -2704,7 +2711,6 @@ static void Chips_GeneralActions(UINT8 Mode)
 			ym2612_set_options((UINT8)ChipOpts[0x00].YM2612.SpecialFlags);
 			ChipOpts[0x01].YM2612.EmuCore = ChipOpts[0x00].YM2612.EmuCore;
 			ChipOpts[0x01].YM2612.SpecialFlags = ChipOpts[0x00].YM2612.SpecialFlags;
-			
 			ChipCnt = (VGMHead.lngHzYM2612 & 0x40000000) ? 0x02 : 0x01;
 			for (CurChip = 0x00; CurChip < ChipCnt; CurChip ++)
 			{
@@ -4999,7 +5005,7 @@ static void InterpretVGM(UINT32 SampleCount)
 					case 0x87:	// YMF278B RAM Image
 						if (! CHIP_CHECK(YMF278B))
 							break;
-						//ymf278b_write_ram(CurChip, ROMSize, DataStart, DataLen, ROMData);
+						ymf278b_write_ram(CurChip, DataStart, DataLen, ROMData);
 						break;
 					case 0x88:	// Y8950 DELTA-T ROM Image
 						if (! CHIP_CHECK(Y8950) || PlayingMode == 0x01)
@@ -5115,6 +5121,16 @@ static void InterpretVGM(UINT32 SampleCount)
 			case 0xE0:	// Seek to PCM Data Bank Pos
 				PCMBank[0x00].DataPos = ReadLE32(&VGMPnt[0x01]);
 				VGMPos += 0x05;
+				break;
+			case 0x31:	// Set AY8910 stereo mask
+				TempByt = VGMPnt[0x01];
+				TempLng = TempByt & 0x3F;
+				CurChip = (TempByt & 0x80)? 1: 0;
+				if (TempByt & 0x40)
+					ym2203_set_stereo_mask_ay(CurChip, TempLng);
+				else
+					ayxx_set_stereo_mask(CurChip, TempLng);
+				VGMPos += 0x02;
 				break;
 			case 0x4F:	// GG Stereo
 				if (CHIP_CHECK(SN76496))

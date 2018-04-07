@@ -21,6 +21,8 @@
 
     <string name="tab">\u0009</string>
 
+    <string name="action_search">Search</string>
+
     <string-array name="Games">
         <item>None...</item>
     </string-array>

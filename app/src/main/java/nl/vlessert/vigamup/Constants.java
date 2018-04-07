@@ -32,9 +32,11 @@ public class Constants {
     }
 
     interface PLATFORM {
-        int MSX = 0;
-        int SNES = 1;
+        int KSS = 0;
+        int SPC = 1;
         int VGM = 2;
+        int NSF = 3;
+        int OTHERS = 3;
     }
 
     public static final String vigamupDirectory = Environment.getExternalStorageDirectory()+"/"+Environment.DIRECTORY_DOWNLOADS+"/ViGaMuP/";

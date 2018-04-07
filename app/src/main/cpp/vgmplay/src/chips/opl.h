@@ -50,6 +50,7 @@ typedef UINT16		Bit16u;
 typedef INT16		Bit16s;
 typedef UINT8		Bit8u;
 typedef INT8		Bit8s;
+
 /*
 	define attribution that inlines/forces inlining of a function (optional)
 */

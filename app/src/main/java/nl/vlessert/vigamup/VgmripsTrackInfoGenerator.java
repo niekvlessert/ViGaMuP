@@ -71,8 +71,8 @@ public class VgmripsTrackInfoGenerator implements Runnable{
                     is.read(vgmHeaderBytes);
                     is.close();
                     String vgmHeader = new String(vgmHeaderBytes,0,3);
-                    //Log.d("VGM", "vgmHeader maybe?: " + vgmHeader);
-                    if (!vgmHeader.equals("Vgm ")){
+                    Log.d("VGM", "vgmHeader maybe?: " + vgmHeader);
+                    if (!vgmHeader.equals("Vgm")){
                         String vgz = Constants.vigamupDirectory+ "tmp/" + fileNameNoPath;
                         String extractedVgm = Constants.vigamupDirectory+ "tmp/" + fileNameNoPath.substring(0,fileNameNoPath.lastIndexOf(".")) + ".vgm2";
                         helpers.unGunzipFile(vgz, extractedVgm);
