@@ -40,6 +40,7 @@ find_library( # Sets the name of the path variable.
 add_subdirectory(src/main/cpp/libkss)
 add_subdirectory(src/main/cpp/game-music-emu-0.6.0)
 add_subdirectory(src/main/cpp/vgmplay)
+add_subdirectory(src/main/cpp/dumb)
 
 # Include libraries needed for native-audio-jni lib
 target_link_libraries(player_engine
@@ -48,6 +49,7 @@ target_link_libraries(player_engine
                       log
                       OpenSLES
                       vgmplay
+                      dumb
                       kss)
 
 #vgmplay

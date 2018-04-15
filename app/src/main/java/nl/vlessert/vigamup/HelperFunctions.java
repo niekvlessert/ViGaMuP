@@ -154,6 +154,7 @@ public class HelperFunctions {
             byte[] buffer = new byte[8192];
             while ((ze = zis.getNextEntry()) != null) {
                 File file = new File(targetDirectory, ze.getName());
+                Log.d("vigamup", ze.getName());
                 File dir = ze.isDirectory() ? file : file.getParentFile();
                 if (!dir.isDirectory() && !dir.mkdirs())
                     throw new FileNotFoundException("Failed to ensure directory: " +
@@ -172,6 +173,44 @@ public class HelperFunctions {
             if (time > 0)
                 file.setLastModified(time);
             */
+            }
+        } finally {
+            zis.close();
+        }
+    }
+
+    public static void unzipFile(File zipFile, File targetDirectory, String fileToExtract) throws IOException {
+        ZipInputStream zis = new ZipInputStream(
+                new BufferedInputStream(new FileInputStream(zipFile)));
+        try {
+            ZipEntry ze;
+            int count;
+            byte[] buffer = new byte[8192];
+            while ((ze = zis.getNextEntry()) != null) {
+                if (ze.toString().equals(fileToExtract)) {
+                    File file = new File(targetDirectory, ze.getName());
+                    Log.d("vigamup", "match found!!: " + ze.getName());
+                    File dir = ze.isDirectory() ? file : file.getParentFile();
+                    if (!dir.isDirectory() && !dir.mkdirs())
+                        throw new FileNotFoundException("Failed to ensure directory: " +
+                                dir.getAbsolutePath());
+                    if (ze.isDirectory())
+                        continue;
+                    FileOutputStream fout = new FileOutputStream(file);
+                    try {
+                        while ((count = zis.read(buffer)) != -1)
+                            fout.write(buffer, 0, count);
+                    } finally {
+                        fout.close();
+                    }
+            /* if time should be restored as well
+            long time = ze.getTime();
+            if (time > 0)
+                file.setLastModified(time);
+            */
+                } /*else {
+                    Log.d("vigamup", "skipping: " + ze.toString());
+                }*/
             }
         } finally {
             zis.close();

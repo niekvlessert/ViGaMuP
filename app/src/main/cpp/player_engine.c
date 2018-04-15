@@ -451,14 +451,14 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
 
     switch (musicType) {
         case 0:
-            __android_log_print(ANDROID_LOG_INFO, "KSS", "Gaat volgende track zetten in... %s", utf8File);
+            //__android_log_print(ANDROID_LOG_INFO, "KSS", "Gaat volgende track zetten in... %s", utf8File);
 
             KSSPLAY_reset(kssplay, globalTrackNumber, 0);
             secondsToGenerate = globalSecondsToPlay;
             if (globalSecondsToPlay==1) globalSecondsToPlay=3;
             trackLength = globalSecondsToPlay;
 
-            __android_log_print(ANDROID_LOG_INFO, "KSS", "Gaat calculaten... %s", utf8File);
+            //__android_log_print(ANDROID_LOG_INFO, "KSS", "Gaat calculaten... %s", utf8File);
             KSSPLAY_calc(kssplay, wavebuf, deviceSampleRate);
             KSSPLAY_calc(kssplay, wavebuf2, deviceSampleRate);
             break;

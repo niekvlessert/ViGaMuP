@@ -1,6 +1,14 @@
 package nl.vlessert.vigamup;
 
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
 import android.content.ClipData;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.database.Cursor;
+import android.net.Uri;
+import android.os.Environment;
 import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -14,11 +22,16 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.RelativeLayout;
+import android.widget.Toast;
+
+import com.google.zxing.integration.android.IntentIntegrator;
+import com.google.zxing.integration.android.IntentResult;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -31,6 +44,9 @@ public class VGMRipsDownloaderActivity extends AppCompatActivity implements Sear
     private VGMRipsDownloaderAdapter mAdapter;
     private RecyclerView.LayoutManager mLayoutManager;
 
+    private DownloadManager downloadManager;
+    private IntentFilter filter;
+    private BroadcastReceiver receiver;
 
     private JSONArray json;
     private JSONArray previousResults = new JSONArray();
@@ -41,6 +57,8 @@ public class VGMRipsDownloaderActivity extends AppCompatActivity implements Sear
         super.onCreate(savedInstanceState);
 
         JSONObject obj;
+
+        downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
 
         setContentView(R.layout.activity_vgmrips_downloader);
         recyclerView = (RecyclerView) findViewById(R.id.my_recycler_view);
@@ -107,10 +125,72 @@ public class VGMRipsDownloaderActivity extends AppCompatActivity implements Sear
             @Override
             public void onItemClicked(RecyclerView recyclerView, int position, View v) {
                 Log.d("ViGaMuP", "blerp");
-                // do it
+                JSONObject obj;
+
+                try {
+                    if (previousResults.length()==0) obj = json.getJSONObject(position);
+                    else obj = previousResults.getJSONObject(position);
+                    Uri Download_Uri2 = Uri.parse(obj.getString("zip_url"));
+                    DownloadManager.Request request2 = new DownloadManager.Request(Download_Uri2);
+                    request2.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
+                    request2.setAllowedOverRoaming(false);
+                    request2.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/VGM/" + obj.getString("zip").substring(obj.getString("zip").lastIndexOf("/")+1) + ".zip");
+                    downloadManager.enqueue(request2);
+                    //Log.d("lazyloading", obj.getString("topic_title"));
+                    Log.d("Vigamup", "zipurl: " + obj.getString("zip_url"));
+                    /*holder.title.setText(obj.getString("topic_title"));
+                    holder.chip.setText("Chips: "+obj.getString("Sound Chips"));
+                    holder.tracks.setText("Tracks: "+obj.getString("Tracks"));
+                    holder.length.setText("Length: "+obj.getString("Playing time"));
+                    holder.composer.setText("Composer(s): "+obj.getString("Composer"));
+                    holder.system.setText("System: "+obj.getString("System"));*/
+
+                } catch (JSONException e){}
+
+                //request2.setTitle(intent.getStringExtra(fileNameImage));
+
             }
         });
 
+        filter = new IntentFilter();
+        filter.addAction(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+
+        receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                Log.d("vigamup", "event!!");
+                if (intent.getAction().equals(DownloadManager.ACTION_DOWNLOAD_COMPLETE)) {
+                    Log.d("Vigamup", "Download event!!: " + intent.getAction());
+                    Bundle extras = intent.getExtras();
+                    DownloadManager manager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+                    DownloadManager.Query q = new DownloadManager.Query();
+                    q.setFilterById(extras.getLong(DownloadManager.EXTRA_DOWNLOAD_ID));
+                    Cursor c = manager.query(q);
+                    if (c.moveToFirst()) {
+                        String downloadFileLocalUri = c.getString(c.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
+                        String name;
+                        if (downloadFileLocalUri != null) {
+                            File mFile = new File(Uri.parse(downloadFileLocalUri).getPath());
+                            name = mFile.getAbsolutePath();
+                            sendResult(name);
+                        }
+                    }
+                }
+            }
+        };
+
+        registerReceiver(receiver, filter);
+
+    }
+
+    private void sendResult(String name) {
+        Intent intent2send = new Intent();
+        intent2send.putExtra("DownloadedFile",name);
+        setResult(1337,intent2send);
+        try {
+            this.unregisterReceiver(receiver);
+        } catch (IllegalArgumentException e) { }
+        finish();
     }
 
     public String loadJSONFromAsset() {
@@ -141,6 +221,14 @@ public class VGMRipsDownloaderActivity extends AppCompatActivity implements Sear
     }
 
     @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+        if (result != null) {
+            Toast.makeText(this, "Filename downloaded: " + result.getContents(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override
     public boolean onQueryTextSubmit(String query) {
         Log.d("lazyloadinstantsearch", "submit!!");
         return false;
@@ -148,7 +236,7 @@ public class VGMRipsDownloaderActivity extends AppCompatActivity implements Sear
 
     private JSONArray filter(JSONArray array, String searchedValue) {
 
-        if (previousSearchedValue.length() < searchedValue.length()) {
+        if (previousSearchedValue.length() < searchedValue.length() && previousResults.length()!=0) {
             array = previousResults;
             Log.d("hmmm", "longer value!!");
         }
@@ -177,9 +265,10 @@ public class VGMRipsDownloaderActivity extends AppCompatActivity implements Sear
 
     @Override
     public boolean onQueryTextChange(String newText) {
-        //Log.d("lazyloadinstantsearch", "change!!");
+        Log.d("vigamup", "change!! newText: " + newText);
 
         JSONArray filtered = filter (json, newText);
+        Log.d("vigamup", "filtered.length" + filtered.length() + " " + previousResults.length());
         if (filtered.length() != previousResults.length()) {
             previousResults = filtered;
             mAdapter.updateData(filtered);

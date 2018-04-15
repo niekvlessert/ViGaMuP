@@ -36,7 +36,8 @@ public class Constants {
         int SPC = 1;
         int VGM = 2;
         int NSF = 3;
-        int OTHERS = 3;
+        int TRACKERS = 4;
+        int OTHERS = 10;
     }
 
     public static final String vigamupDirectory = Environment.getExternalStorageDirectory()+"/"+Environment.DIRECTORY_DOWNLOADS+"/ViGaMuP/";

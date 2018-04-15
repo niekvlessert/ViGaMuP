@@ -139,7 +139,7 @@ public class MultipleItemsList extends ListFragment {
             MultipleItemsList.ViewHolder holder;
             int type = getItemViewType(position);
 
-            if (type==GAME_LIST_MENU_ITEM) {
+            if (type == GAME_LIST_MENU_ITEM) {
                 holder = new MultipleItemsList.ViewHolder();
                 GameListMenuItem item = (GameListMenuItem) gameObjects.get(position);
                 boolean hasMorePlatFormsAfter = item.getMorePlatformsAfter();
@@ -160,6 +160,12 @@ public class MultipleItemsList extends ListFragment {
                         break;
                     case Constants.PLATFORM.VGM:
                         holder.textView2.setText("VGM");
+                        break;
+                    case Constants.PLATFORM.NSF:
+                        holder.textView2.setText("NSF");
+                        break;
+                    case Constants.PLATFORM.TRACKERS:
+                        holder.textView2.setText("Trackers");
                         break;
                     case Constants.PLATFORM.OTHERS:
                         holder.textView2.setText("Other platforms");
@@ -201,12 +207,10 @@ public class MultipleItemsList extends ListFragment {
                         //holder2.textView.setHeight(300);
                     } else {
                         int musicType = gameObjects.get(position).getMusicType();
-                        if (musicType>2) {
-                            if (musicType == Constants.PLATFORM.NSF) {
-                                information = information.concat("\nNSF format, NES");
-                                String composers = gameObjects.get(position).getComposers();
-                                if (composers.length()>0) information = information.concat("\n"+ composers);
-                            }
+                        if (musicType == Constants.PLATFORM.NSF) {
+                            information = information.concat("\nNSF format, NES");
+                            String composers = gameObjects.get(position).getComposers();
+                            if (composers.length()>0) information = information.concat("\n"+ composers);
                         }
                     }
                     holder.textView2.setText(information);

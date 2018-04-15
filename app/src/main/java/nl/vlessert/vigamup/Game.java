@@ -11,7 +11,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
@@ -77,14 +76,19 @@ public class Game {
             this.musicFileC = "/sdcard/Download/ViGaMuP/" + musicExtension + "/" + gameName + musicArchive;
             this.imageFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".png");
             this.position = position;
-            if (musicType != Constants.PLATFORM.OTHERS) {
-                //Log.d(LOG_TAG, "musictype: " + musicExtension);
-                readGameInfo(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".gameinfo"));
-                if (!readTrackInformation(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".trackinfo"))) {
-                    trackInformationAvailable = false;
-                }
-            } else {
-                readInfoFromOthers(gameName);
+
+            if (musicType == Constants.PLATFORM.NSF) readInfoFromNSF(gameName);
+            if (musicType == Constants.PLATFORM.TRACKERS) addTrackerTrack(gameName);
+
+            switch (musicType){
+                case Constants.PLATFORM.KSS:
+                case Constants.PLATFORM.SPC:
+                case Constants.PLATFORM.VGM:
+                    readGameInfo(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".gameinfo"));
+                    if (!readTrackInformation(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".trackinfo"))) {
+                        trackInformationAvailable = false;
+                    }
+                    break;
             }
 
             helpers = new HelperFunctions();
@@ -329,10 +333,11 @@ public class Game {
     }
 
     public void extractCurrentVgmTrackfromZip() {
-        String vgmFileName = getCurrentTrackFileName();
+        //String vgmFileName = getCurrentTrackFileName();
         String zipFileName = musicFileC;
         try {
-            helpers.unzip(new File(zipFileName), new File(Constants.vigamupDirectory+"tmp"));
+            String fileName = trackInformation.get(position).getFileName();
+            helpers.unzipFile(new File(zipFileName), new File(Constants.vigamupDirectory+"tmp"), trackInformation.get(position).getFileName());
         } catch (IOException e) {
             Log.d("VGM", e.toString());
         }
@@ -342,6 +347,7 @@ public class Game {
         switch (musicType){
             case Constants.PLATFORM.KSS:
             case Constants.PLATFORM.OTHERS:
+            case Constants.PLATFORM.NSF:
                 return musicFileC;
             case Constants.PLATFORM.SPC:
             case Constants.PLATFORM.VGM:
@@ -352,8 +358,12 @@ public class Game {
         return null;
     }
 
-    private void readInfoFromOthers(String gameName) {
-        File folder = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/Other/");
+    private void addTrackerTrack(String trackFileName) {
+        trackInformation.add(new GameTrack(0, trackFileName.substring(0, 1).toUpperCase() + trackFileName.substring(1), 30, 0, true, 0, "/sdcard/Download/ViGaMuP/NSF/" + trackFileName + ".xm"));
+    }
+
+    private void readInfoFromNSF(String gameName) {
+        File folder = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/NSF/");
         File[] listOfFiles = folder.listFiles();
 
         for (File file : listOfFiles)
@@ -361,8 +371,7 @@ public class Game {
             if (file.isFile())
             {
                 String[] filename = file.getName().split("\\.(?=[^\\.]+$)"); //split filename from it's extension
-                if(filename[0].equalsIgnoreCase(gameName)) { //matching defined filename
-                    //System.out.println("File exist: "+filename[0]+"."+filename[1]); // match occures.Apply any condition what you need
+                if(filename[0].equalsIgnoreCase(gameName)) {
                     if (filename[1].equalsIgnoreCase("nsf")) {
                         findDataInNsf(filename[0] + "." + filename[1]);
                     }
@@ -372,7 +381,7 @@ public class Game {
     }
 
     private void findDataInNsf(String fileName){
-        File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/Other/" + fileName);
+        File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/NSF/" + fileName);
         try {
             RandomAccessFile raf = new RandomAccessFile(file, "r");
 
@@ -413,13 +422,14 @@ public class Game {
                 if (i+1<10) trackTitle = "0"+ Integer.toString(i+1); else trackTitle = Integer.toString(i+1);
                 trackTitle += " - Track " + (i+1);
                 trackInformation.add(new GameTrack(i, trackTitle, 30, 0, true, i, musicFileC));
+                Log.d("VIGAMUP", "call aangeroepen!!");
             }
 
         } catch (FileNotFoundException e) {
             Log.d(LOG_TAG, "File not found!!");
         } catch (IOException e) {}
-        this.musicFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/Other/" + gameName + ".nsf");
-        this.musicFileC = "/sdcard/Download/ViGaMuP/Other/" + gameName + ".nsf";
+        this.musicFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/NSF/" + gameName + ".nsf");
+        this.musicFileC = "/sdcard/Download/ViGaMuP/NSF/" + gameName + ".nsf";
 
     }
 

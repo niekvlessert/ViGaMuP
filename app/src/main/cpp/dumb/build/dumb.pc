@@ -1,0 +1,12 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=/usr/local/lib
+includedir=/usr/local/include
+
+Name: DUMB
+Description: DUMB is a module audio renderer library. 
+Version: 2.0
+URL: https://github.com/kode54/dumb/
+Libs: -L${libdir} -llibdumb
+Libs.private: -lm
+Cflags: -I${includedir} 

@@ -602,7 +602,29 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        Log.d("vigamup result", "result: " + resultCode);
         IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+        if (resultCode == 1337) {
+            Log.d(LOG_TAG, "Generating vgmrips gameinfo!!!");
+            String name = data.getStringExtra("DownloadedFile");
+            String game = name.substring(name.lastIndexOf("/") + 1);
+            Log.d(LOG_TAG, "name: " + name);
+            Thread t = new Thread(new VgmripsTrackInfoGenerator(mPlayerService, game, getApplicationContext()));
+            t.start();
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            recreate();
+            if (checkForMusicAndInitialize()) {
+                forceRecreateGameCollection = true;
+                showMusicList();
+            }
+            return;
+        }
         if (result != null) {
             if (result.getContents()==null){
                 Toast.makeText(this, "You cancelled...", Toast.LENGTH_LONG).show();
@@ -641,6 +663,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                         downloadReference = downloadManager.enqueue(request);
                     } else {
                         if (result.getContents().contains("vgmrips") && result.getContents().contains("zip")) {
+                            Log.d("Downloaded", result.getContents());
                             Uri Download_Uri = Uri.parse(result.getContents());
                             DownloadManager.Request request = new DownloadManager.Request(Download_Uri);
                             request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
@@ -651,6 +674,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                                 helpers.deleteDirectory("VGM/" + fileName);
                             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/VGM/" + fileName);
                             downloadReference = downloadManager.enqueue(request);
+                            Log.d("vigamup","reference: " + downloadReference);
                         } else {
                             Toast.makeText(this, "This is not a ViGaMuP file...", Toast.LENGTH_LONG).show();
                         }
@@ -743,15 +767,19 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
     }
 
     private void unpackDownloadedFile(Context context, Intent intent){
-        Log.d(LOG_TAG,"Download event!!!!");
+        //Log.d(LOG_TAG,"Download event!!!!");
         String action = intent.getAction();
-        if (DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(action) && downloadReference!=null) {
+        //Log.d("vigamup download result", action + ", " + downloadReference);
+        if (DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(action)){// && downloadReference!=null) {
 
             // get the DownloadManager instance
             DownloadManager manager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
 
             DownloadManager.Query q = new DownloadManager.Query();
-            q.setFilterById(downloadReference);
+            //q.setFilterById(downloadReference);
+
+            Bundle extras = intent.getExtras();
+            q.setFilterById(extras.getLong(DownloadManager.EXTRA_DOWNLOAD_ID));
             Cursor c = manager.query(q);
 
             if (c.moveToFirst()) {
@@ -773,7 +801,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     if (name.contains("vigamup")) { //should be zip..
                         try {
                             helpers.unzip(file, targetDirectory);
-                            //Log.d(LOG_TAG, "Unzipped...");
+                            Log.d(LOG_TAG, "Unzipped...");
                             boolean deleted = file.delete();
                             if (checkForMusicAndInitialize()) {
                                 forceRecreateGameCollection = true;
@@ -1089,7 +1117,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
     private void downloadVGMRips(){
         Intent intent = new Intent(this, VGMRipsDownloaderActivity.class);
-        startActivity(intent);
+        startActivityForResult(intent, 1337);
     }
 
     public static void increaseClickArea(View parent, View child) {

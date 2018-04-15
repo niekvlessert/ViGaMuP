@@ -35,83 +35,46 @@ public class GameCollection{
         this.ctx = ctx;
     }
 
-    public void createGameCollection() {
-        File parentDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/KSS/");
-        gameObjects = new ArrayList<>();
-        File[] files = parentDir.listFiles();
+    private void searchForMusicTypeAndAddToListIfFound(String directory, String extension, int typeToAdd){
+        File parentDir;
+        File[] files;
         String[] strings;
         int position = 0;
+
+        parentDir = new File(directory);
+        files = parentDir.listFiles();
         if (files != null) {
             for (File file : files) {
-                if (file.getName().endsWith(".kss")) {
+                if (file.getName().endsWith(extension)) {
                     strings = file.getName().split("\\.");
-                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.KSS, ctx, 0));
+                    //Log.d("Vigamuppet", strings[0]);
+                    gameObjects.add(new Game(strings[0], typeToAdd, ctx, 0));
                     position++;
                 }
             }
         }
-        if (position>0) {
-            Log.d(LOG_TAG,"foundMusicTypes.add(Constants.PLATFORM.KSS");
-            foundMusicTypes.add(Constants.PLATFORM.KSS);
+        if (position>0 && !foundMusicTypes.contains(typeToAdd)) {
+            Log.d(LOG_TAG,"adding "+extension+" to foundMusicTypes");
+            foundMusicTypes.add(typeToAdd);
         }
-        int storedPosition = position;
-        parentDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/SPC/");
-        files = parentDir.listFiles();
-        if (files!=null) {
-            for (File file : files) {
-                if (file.getName().endsWith(".rsn")) {
-                    strings = file.getName().split("\\.");
-                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.SPC, ctx, 0));
-                    position++;
-                }
-            }
-        }
-        if (position>storedPosition) {
-            Log.d(LOG_TAG,"foundMusicTypes.add(Constants.PLATFORM.SPC");
-            foundMusicTypes.add(Constants.PLATFORM.SPC);
-        }
+    }
 
-        storedPosition = position;
-        parentDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/VGM/");
-        files = parentDir.listFiles();
-        if (files!=null) {
-            for (File file : files) {
-                if (file.getName().endsWith(".zip")) {
-                    strings = file.getName().split("\\.");
-                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.VGM, ctx, 0));
-                    position++;
-                }
-            }
-        }
-        if (position>storedPosition) {
-            Log.d(LOG_TAG,"foundMusicTypes.add(Constants.PLATFORM.VGM");
-            foundMusicTypes.add(Constants.PLATFORM.VGM);
-        }
+    public void createGameCollection() {
+        gameObjects = new ArrayList<>();
 
-        storedPosition = position;
-        parentDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/Other/");
-        files = parentDir.listFiles();
-        if (files!=null) {
-            for (File file : files) {
-                if (file.getName().endsWith(".nsf")) {
-                    strings = file.getName().split("\\.");
-                    Log.d(LOG_TAG, "Adding: "+ strings[0]);
-                    gameObjects.add(new Game(strings[0], Constants.PLATFORM.NSF, ctx, 0));
-                    position++;
-                }
-            }
-        }
-        if (position>storedPosition) {
-            Log.d(LOG_TAG,"foundMusicTypes.add(Constants.PLATFORM.OTHERS");
-            foundMusicTypes.add(Constants.PLATFORM.OTHERS);
-        }
+        searchForMusicTypeAndAddToListIfFound(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/KSS/", "kss", Constants.PLATFORM.KSS);
+        searchForMusicTypeAndAddToListIfFound(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/SPC/", "rsn", Constants.PLATFORM.SPC);
+        searchForMusicTypeAndAddToListIfFound(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/VGM/", "zip", Constants.PLATFORM.VGM);
+        searchForMusicTypeAndAddToListIfFound(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/NSF/", "nsf", Constants.PLATFORM.NSF);
+        searchForMusicTypeAndAddToListIfFound(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/Trackers/", "xm", Constants.PLATFORM.TRACKERS);
 
         gameObjectsWithTrackInformation = new ArrayList<>();
         gameObjectsWithoutTrackInformation = new ArrayList<>();
+        Log.d("vigamup", "hmm: " + gameObjects.size());
         for (Game game : gameObjects){
             if (game.hasTrackInformationList()){
                 gameObjectsWithTrackInformation.add(game);
-                //Log.d("KSS","adding: " + game.gameName + " " + game.position);
+                Log.d("KSS","adding: " + game.gameName + " " + game.position);
             } else gameObjectsWithoutTrackInformation.add(game);
         }
         Collections.sort(gameObjectsWithTrackInformation, new GameCollectionTitleComperator());
