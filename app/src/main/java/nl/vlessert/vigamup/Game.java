@@ -1,8 +1,12 @@
 package nl.vlessert.vigamup;
 
 import android.content.Context;
+import android.os.AsyncTask;
 import android.os.Environment;
+import android.os.Handler;
 import android.util.Log;
+
+import net.lingala.zip4j.unzip.Unzip;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -17,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Created by niek on 20/02/17.
@@ -38,7 +43,9 @@ public class Game {
 
     private HelperFunctions helpers;
 
-    private Context ctx;
+    private PlayerService playerService;
+
+    //private Context ctx;
 
     public String vendor = "";
     public String year = "";
@@ -55,8 +62,10 @@ public class Game {
     private static final int REPEAT_TIMES=2;
     private static final String LOG_TAG = "Game";
 
-    public Game(String gameName, int musicType, Context ctx, int position){
-        this.ctx = ctx;
+    //private boolean unzippingDone = false;
+
+    public Game(String gameName, int musicType, int position, String trackerFileExtension){
+        //this.ctx = ctx;
         this.gameName = gameName;
         this.musicType = musicType;
         if (musicType == Constants.PLATFORM.KSS) {
@@ -70,6 +79,9 @@ public class Game {
         if (musicType == Constants.PLATFORM.VGM) {
             musicExtension = "VGM";
             musicArchive = ".zip";
+        }
+        if (musicType == Constants.PLATFORM.TRACKERS) {
+            musicExtension = "Trackers";
         }
         if (!gameName.equals("header")) {
             this.musicFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + musicArchive);
@@ -88,6 +100,9 @@ public class Game {
                     if (!readTrackInformation(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".trackinfo"))) {
                         trackInformationAvailable = false;
                     }
+                    break;
+                case Constants.PLATFORM.TRACKERS:
+                    this.musicFileC = this.musicFileC+"."+trackerFileExtension;
                     break;
             }
 
@@ -332,14 +347,78 @@ public class Game {
         ea.extractFileFromArchive(new File(rsnFileName), new File(spcFileName), new File(Constants.vigamupDirectory + "tmp/"));
     }
 
+    public void serviceObjectToGameObject(PlayerService ps) {
+        Log.d(LOG_TAG, "playerService Connected!!");
+        this.playerService = ps;
+    }
+
     public void extractCurrentVgmTrackfromZip() {
         //String vgmFileName = getCurrentTrackFileName();
         String zipFileName = musicFileC;
-        try {
-            String fileName = trackInformation.get(position).getFileName();
-            helpers.unzipFile(new File(zipFileName), new File(Constants.vigamupDirectory+"tmp"), trackInformation.get(position).getFileName());
-        } catch (IOException e) {
-            Log.d("VGM", e.toString());
+        Unzipper unzipper = new Unzipper(playerService);
+        //try {
+            unzipper.execute(zipFileName);
+        //} catch (InterruptedException | ExecutionException e){
+            //Log.d("VGM", e.toString());
+        //}
+        //try {
+            //String fileName = trackInformation.get(position).getFileName();
+            //Log.d(LOG_TAG, "VGMFile in functie: " + fileName + " en " + trackInformation.get(position).getFileName());
+            //Runnable r = new Unzipper(zipFileName);
+            //Thread t = new Thread (r);
+            //t.start();
+            //try { t.join(); } catch (InterruptedException e) { e.printStackTrace(); }
+        //helpers.unzipFile(new File(zipFileName), new File(Constants.vigamupDirectory + "tmp"), trackInformation.get(position).getFileName());
+        //} catch (IOException e) {
+            //Log.d("VGM", e.toString());
+        //}
+    }
+
+    /*class Unzipper implements Runnable {
+        private String zipFileName;
+        private HelperFunctions helperFunctions;
+
+        public Unzipper(String zipFileName){
+            this.zipFileName = zipFileName;
+            helperFunctions = new HelperFunctions();
+        }
+
+        @Override
+        public void run() {
+            try {
+                Log.d(LOG_TAG, "VGMFile in functie: " + zipFileName + " en " + trackInformation.get(position).getFileName());
+                helperFunctions.unzipFile(new File(zipFileName), new File(Constants.vigamupDirectory + "tmp"), trackInformation.get(position).getFileName());
+            } catch (IOException e) {
+                Log.d("VGM", e.toString());
+            }
+        }
+    }*/
+
+    private class Unzipper extends AsyncTask<String, Void, String> {
+        private HelperFunctions helperFunctions;
+        private PlayerService playerService;
+
+        public Unzipper(PlayerService ps){
+            this.playerService = ps;
+        }
+
+        @Override
+        protected String doInBackground(String... zipFileNames){
+            try {
+                helperFunctions = new HelperFunctions();
+                Log.d(LOG_TAG, "VGMFile in functie: " + zipFileNames[0] + " en " + trackInformation.get(position).getFileName());
+                helperFunctions.unzipFile(new File(zipFileNames[0]), new File(Constants.vigamupDirectory + "tmp"), trackInformation.get(position).getFileName());
+                return "Unzip succesful";
+            } catch (IOException e) {
+                Log.d("VGM", e.toString());
+                return "Unzip problem";
+            }
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            Log.d(LOG_TAG, "Extraction done, starting playback!");
+            playerService.startVGMPlayback();
         }
     }
 
@@ -348,18 +427,19 @@ public class Game {
             case Constants.PLATFORM.KSS:
             case Constants.PLATFORM.OTHERS:
             case Constants.PLATFORM.NSF:
+            case Constants.PLATFORM.TRACKERS:
+                Log.d("ViGaMuP nieuw", "filename: " +musicFileC);
                 return musicFileC;
             case Constants.PLATFORM.SPC:
             case Constants.PLATFORM.VGM:
                 return Constants.vigamupDirectory+"tmp/"+trackInformation.get(position).getFileName();
                 //return "/sdcard/Download/ViGaMuP/tmp/"+trackInformation.get(position).getFileName();
-
         }
         return null;
     }
 
     private void addTrackerTrack(String trackFileName) {
-        trackInformation.add(new GameTrack(0, trackFileName.substring(0, 1).toUpperCase() + trackFileName.substring(1), 30, 0, true, 0, "/sdcard/Download/ViGaMuP/NSF/" + trackFileName + ".xm"));
+        trackInformation.add(new GameTrack(0, trackFileName.substring(0, 1).toUpperCase() + trackFileName.substring(1), 30, 0, true, 0, "/sdcard/Download/ViGaMuP/Trackers/" + trackFileName + ".xm"));
     }
 
     private void readInfoFromNSF(String gameName) {

@@ -33,6 +33,7 @@ import android.support.v4.app.FragmentStatePagerAdapter;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.view.ViewPager;
+import android.support.v4.widget.SlidingPaneLayout;
 import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.TouchDelegate;
@@ -477,6 +478,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                 //Log.d(LOG_TAG,"playing from onserviceconnected and service not paused!!");
                 //Game game = gameCollection.getCurrentGame();
                 Game game = mPlayerService.getCurrentGame();
+                game.serviceObjectToGameObject(mPlayerService);
                 seekBar.setMax(game.getCurrentTrackLength());
                 bufferBarProgress = 2; // 2 seconds buffered always in advance...
                 seekBarThumbProgress = 0;
@@ -911,11 +913,12 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
             }
             helpers.deleteAllFilesInDirectory("tmp/");
         }
-        if (!musicFound) {
-            firstRun = true;
-            downloadMusic();
-            return false;
-        } else return true;
+        //if (!musicFound) {
+            //firstRun = true;
+            //downloadMusic();
+            //return false;
+        //} else
+        return true;
     }
 
     private void showMusicList(){
@@ -1014,6 +1017,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                         public void run() {
                             if (gamePosition!=-1) gameCollection.setCurrentGame(gamePosition);
                             Game game = gameCollection.getCurrentGame();
+                            game.serviceObjectToGameObject(mPlayerService);
                             seekBar.setMax(game.getCurrentTrackLength());
                             bufferBarProgress = 2; // 2 seconds buffered always in advance...
                             seekBarThumbProgress = 0;

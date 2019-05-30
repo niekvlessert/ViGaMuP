@@ -2,6 +2,8 @@
 # library. You should either keep the default value or only pass a
 # value of 3.4.0 or lower.
 
+include_directories(${ANDROID_SYSROOT}/usr/include/arm-linux-androideabi)
+
 cmake_minimum_required(VERSION 3.4.1)
 
 # Creates and names a library, sets it as either STATIC

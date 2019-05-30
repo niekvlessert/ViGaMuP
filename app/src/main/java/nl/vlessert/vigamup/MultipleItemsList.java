@@ -84,7 +84,7 @@ public class MultipleItemsList extends ListFragment {
         private void addGamesFromPlatform(GameCollection gameCollection, int platform){
 
             // insert / append gameListMenuItems for every platform type
-            GameListMenuItem item = new GameListMenuItem("header", platform, ctx, 0);
+            GameListMenuItem item = new GameListMenuItem("header", platform, 0,"");
             ArrayList<Integer> foundMusicTypes = gameCollection.getFoundMusicTypes();
             if (foundMusicTypes.indexOf(platform)>0) item.setMorePlatformsBefore();
             if (foundMusicTypes.indexOf(platform)+1<foundMusicTypes.size()) item.setMorePlatformsAfter();

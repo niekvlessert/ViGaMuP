@@ -45,6 +45,8 @@ public class PlayerService extends Service{
 
     public GameCollection gameCollection;
 
+    private PlayerService playerService = this;
+
     PendingIntent ppreviousIntent;
     PendingIntent pplayIntent;
     PendingIntent pnextIntent;
@@ -160,7 +162,22 @@ public class PlayerService extends Service{
             togglePlaybackJava();
         } else if (intent.getAction().equals(Constants.ACTION.NEXT_ACTION)) {
             Log.i(LOG_TAG, "Clicked Next/Exit: " + paused);
-            if (paused) sendBroadcast(new Intent("destroyAppAndService"));
+            if (paused) {
+                sendBroadcast(new Intent("destroyAppAndService"));
+                Handler handler = new Handler();
+                handler.postDelayed(new Runnable() {
+                    public void run() {
+                        Intent stopIntent = new Intent(PlayerService.this, PlayerService.class);
+                        stopIntent.setAction(Constants.ACTION.STOPFOREGROUND_ACTION);
+                        stopService(stopIntent);
+                        stopForeground(true);
+                        unregisterReceiver(receiver);
+                        stopSelf();
+
+                        shutdown();
+                    }
+                }, 2000);
+            }
             else nextTrack();
         } else if (intent.getAction().equals(Constants.ACTION.REPEAT_ACTION)) {
             Log.i(LOG_TAG, "Clicked Repeat");
@@ -675,8 +692,10 @@ public class PlayerService extends Service{
                 currentGame.extractCurrentSpcTrackfromRSN();
                 break;
             case Constants.PLATFORM.VGM:
+                Log.d(LOG_TAG, "In VGM extraction...");
                 currentGame.extractCurrentVgmTrackfromZip();
-                break;
+                return;
+                //break;
         }
 
         playTrack(currentGame.getMusicType(), currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
@@ -686,6 +705,19 @@ public class PlayerService extends Service{
 
         updateNotificationTitles();
         updateA2DPInfo();
+    }
+
+    public void startVGMPlayback(){
+        Game game = gameCollection.getCurrentGame();
+
+        Log.d(LOG_TAG,"In startvgmplayback! info: " + game.getMusicType()+" "+game.getCurrentTrackFileNameFullPath()+" "+game.getCurrentTrackNumber()+" "+game.getCurrentTrackLength());
+        playTrack(game.getMusicType(), game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+
+        updateNotificationTitles();
+        updateA2DPInfo();
+        setPlayingStatePlaying();
+
+        if (paused) paused = togglePlayback();
     }
 
     public void playCurrentTrack() {
@@ -702,9 +734,10 @@ public class PlayerService extends Service{
                 break;
             case Constants.PLATFORM.VGM:
                 game.extractCurrentVgmTrackfromZip();
-                break;
+                return;
+                //break;
         }
-        Log.d(LOG_TAG,"info: " + game.getMusicType()+" "+game.getCurrentTrackFileNameFullPath()+" "+game.getCurrentTrackNumber()+" "+game.getCurrentTrackLength());
+        Log.d(LOG_TAG,"In playCurrentTrack! info: " + game.getMusicType()+" "+game.getCurrentTrackFileNameFullPath()+" "+game.getCurrentTrackNumber()+" "+game.getCurrentTrackLength());
         playTrack(game.getMusicType(), game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackNumber(), game.getCurrentTrackLength());
 
         updateNotificationTitles();

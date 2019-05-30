@@ -40,7 +40,7 @@ public class VgmripsTrackInfoGenerator implements Runnable{
         }
 
         final File zip = new File(Constants.vigamupDirectory+"VGM/"+ zipFile);
-        final File destinationFolder = new File(Constants.vigamupDirectory+"tmp");
+        final File destinationFolder = new File(Constants.vigamupDirectory+"tmp/"+zipFile);
 
         //Log.d("VGM info generator", "zip: " + zip + ", folder: " + destinationFolder);
         try {
@@ -48,7 +48,7 @@ public class VgmripsTrackInfoGenerator implements Runnable{
         } catch (IOException e) {
             Log.d("VGM", e.toString());
         }
-        File files[] = helpers.getAllFilesInDirectory("tmp/");
+        File files[] = helpers.getAllFilesInDirectory("tmp/"+zipFile);
         Log.d("VGM info generator", "after zip: " + files.length);
         helpers.deleteFile("VGM", baseGameName+".trackinfo");
         helpers.deleteFile("VGM", baseGameName+".gameinfo");
@@ -73,10 +73,10 @@ public class VgmripsTrackInfoGenerator implements Runnable{
                     String vgmHeader = new String(vgmHeaderBytes,0,3);
                     Log.d("VGM", "vgmHeader maybe?: " + vgmHeader);
                     if (!vgmHeader.equals("Vgm")){
-                        String vgz = Constants.vigamupDirectory+ "tmp/" + fileNameNoPath;
-                        String extractedVgm = Constants.vigamupDirectory+ "tmp/" + fileNameNoPath.substring(0,fileNameNoPath.lastIndexOf(".")) + ".vgm2";
+                        String vgz = Constants.vigamupDirectory+ "tmp/" + zipFile + "/" + fileNameNoPath;
+                        String extractedVgm = Constants.vigamupDirectory+ "tmp/" + zipFile + "/" + fileNameNoPath.substring(0,fileNameNoPath.lastIndexOf(".")) + ".vgm2";
                         helpers.unGunzipFile(vgz, extractedVgm);
-                        f = new File(Constants.vigamupDirectory+ "tmp/" + fileNameNoPath.substring(0,fileNameNoPath.lastIndexOf(".")) + ".vgm2");
+                        f = new File(Constants.vigamupDirectory+ "tmp/" +zipFile + "/" + fileNameNoPath.substring(0,fileNameNoPath.lastIndexOf(".")) + ".vgm2");
                     }
                     int trackLengthSeconds = 0;
                     byte[] header = new byte[0x24];
@@ -96,9 +96,14 @@ public class VgmripsTrackInfoGenerator implements Runnable{
                     Log.d("VGM", "looplength: " + Long.parseLong(helpers.bytesToHex(loopLength), 16)/44100);
                     Long trackLengthLong = Long.parseLong(helpers.bytesToHex(trackLength), 16);
                     Long loopLengthLong = Long.parseLong(helpers.bytesToHex(loopLength), 16);
-                    if (loopLengthLong > 0) trackLengthLong = trackLengthLong + (1*loopLengthLong);
+                    int fadeTime = 0;
+                    if (loopLengthLong > 0) {
+                        trackLengthLong = trackLengthLong + (1*loopLengthLong);
+                        fadeTime = 5;
+                    }
                     Long trackLengthSecondsLong = trackLengthLong/44100;
-                    trackLengthSeconds = helpers.safeLongToInt(trackLengthSecondsLong)+5;
+                    trackLengthSeconds = helpers.safeLongToInt(trackLengthSecondsLong)+fadeTime;
+                    if (trackLengthSeconds==0) trackLengthSeconds = 1;
                     Log.d("VGM", "ok, tracklengthlong: " + trackLengthLong + ", seconds: " + trackLengthSeconds);
                     if (splitChar.length()==0) {
                         if (fileNameNoPath.indexOf(" ")==2) splitChar = " ";
@@ -112,9 +117,9 @@ public class VgmripsTrackInfoGenerator implements Runnable{
                     trackNr++;
                 }
                 if (fileNameNoPath.contains(".png")) {
-                    Log.d("VGM", "Moving file: " + fileNameNoPath);
+                    Log.d("VGM", "Moving file: " + zipFile + "/" + fileNameNoPath);
                     helpers.deleteFile("VGM", baseGameName + ".png");
-                    helpers.moveFile("tmp/" + fileNameNoPath, "VGM/" + baseGameName + ".png");
+                    helpers.moveFile("tmp/" + zipFile + "/" + fileNameNoPath, "VGM/" + baseGameName + ".png");
                 }
                 if (fileNameNoPath.contains(".txt")) {
                     RandomAccessFile raf = new RandomAccessFile(file, "rw");
@@ -131,6 +136,9 @@ public class VgmripsTrackInfoGenerator implements Runnable{
             fWriter2.write("tracks_to_play:"+tracks_to_play.substring(0,tracks_to_play.length()-1));
             fWriter2.flush();
             fWriter2.close();
+
+            helpers.deleteAllFilesInDirectory("tmp/" + zipFile + "/");
+            helpers.deleteDirectory("tmp/" + zipFile);
 
         }
         catch (FileNotFoundException e) {

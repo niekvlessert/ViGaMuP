@@ -879,7 +879,7 @@ void PlayVGM(void)
 	
 	//PausePlay = false;
 	FadePlay = false;
-	MasterVol = 1.0f;
+	MasterVol = 2000000.0f;
 	ForceVGMExec = false;
 	AutoStopSkip = false;
 	FadeStart = 0;
@@ -2568,7 +2568,7 @@ static void RestartPlaying(void)
 	ForceVGMExec = false;
 #ifndef CONSOLE_MODE
 	FadePlay = false;
-	MasterVol = 1.0f;
+	MasterVol = 200000.0f;
 	FadeStart = 0;
 	FinalVol = VolumeLevelM;
 	PlayingTime = 0;

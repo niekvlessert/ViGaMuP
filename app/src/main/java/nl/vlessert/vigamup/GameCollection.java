@@ -45,10 +45,17 @@ public class GameCollection{
         files = parentDir.listFiles();
         if (files != null) {
             for (File file : files) {
-                if (file.getName().endsWith(extension)) {
+                if (!extension.equals("")) {
+                    if (file.getName().endsWith(extension)) {
+                        strings = file.getName().split("\\.");
+                        Log.d(LOG_TAG,"wow "+strings[1]+" found...");
+                        gameObjects.add(new Game(strings[0], typeToAdd, 0, strings[1]));
+                        position++;
+                    }
+                } else {
                     strings = file.getName().split("\\.");
-                    //Log.d("Vigamuppet", strings[0]);
-                    gameObjects.add(new Game(strings[0], typeToAdd, ctx, 0));
+                    gameObjects.add(new Game(strings[0], typeToAdd, 0, strings[1]));
+                    Log.d(LOG_TAG,"wow2 "+strings[1]+" found...");
                     position++;
                 }
             }
@@ -66,7 +73,7 @@ public class GameCollection{
         searchForMusicTypeAndAddToListIfFound(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/SPC/", "rsn", Constants.PLATFORM.SPC);
         searchForMusicTypeAndAddToListIfFound(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/VGM/", "zip", Constants.PLATFORM.VGM);
         searchForMusicTypeAndAddToListIfFound(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/NSF/", "nsf", Constants.PLATFORM.NSF);
-        searchForMusicTypeAndAddToListIfFound(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/Trackers/", "xm", Constants.PLATFORM.TRACKERS);
+        searchForMusicTypeAndAddToListIfFound(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/Trackers/", "", Constants.PLATFORM.TRACKERS);
 
         gameObjectsWithTrackInformation = new ArrayList<>();
         gameObjectsWithoutTrackInformation = new ArrayList<>();

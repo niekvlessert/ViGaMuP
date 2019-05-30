@@ -17,6 +17,7 @@
 #include "libkss/src/kssplay.h"
 #include "game-music-emu-0.6.0/gme/gme.h"
 #include "vgmplay/src/VGMPlay_Intf.h"
+#include "dumb/include/dumb.h"
 
 // engine interfaces
 static SLObjectItf engineObject = NULL;
@@ -59,6 +60,7 @@ int loopTrack = 0;
 int loopTrackWasEnabled = 0;
 int skipToNextTrack = 0;
 int secondsToSkipWhenCopyingToBuffer = 2;
+int nextTrackStarted = 0;
 
 int globalTrackNumber = 0;
 int globalSecondsToPlay = 0;
@@ -71,6 +73,36 @@ static int MUSIC_TYPE_KSS = 0;
 static int MUSIC_TYPE_SPC = 1;
 static int MUSIC_TYPE_VGM = 2;
 static int MUSIC_TYPE_NSF = 3;
+static int MUSIC_TYPE_TRACKERS = 4;
+
+enum ENDIANNESS { DUMB_LITTLE_ENDIAN = 0, DUMB_BIG_ENDIAN };
+
+typedef struct {
+    DUH_SIGRENDERER *renderer;
+    DUH *src;
+    sample_t **sig_samples;
+    long sig_samples_size;
+    FILE *dst;
+    float delta;
+    int bufsize;
+    bool is_stdout;
+} streamer_t; // Dumb streamer struct
+
+typedef struct {
+    int bits;
+    int endianness;
+    int is_unsigned;
+    int freq;
+    int quality;
+    int n_channels;
+    float volume;
+    float delay;
+    const char *input;
+    char *output;
+} settings_t;
+
+streamer_t streamer;
+settings_t settings;
 
 char *LOG_TAG = "Glue";
 
@@ -84,6 +116,7 @@ pthread_t t1;
 int deviceSampleRate = 48000;
 UINT32 SampleRate = 48000;
 extern UINT32 VGMMaxLoop;
+float MasterVol = 2.0f;
 
 int16_t *queueBuffer1, *queueBuffer2, *queueBuffer3;
 int16_t *queueBufferSilence;
@@ -138,10 +171,10 @@ int checkForSilence(int16_t* queueBuffer){
 }
 
 int queueSecondIfRequired(void *context){
-    int i, j;
+    /*int i, j;
     int a=1;
-    int16_t sum=0;
-    if (queueSecond && secondsPlayed<trackLength) {
+    int16_t sum=0;*/
+    if (queueSecond && secondsPlayed+1<trackLength && !nextTrackStarted) {
         if (queueBufferToUse == 1) {
             /*for (j = 0; j<secondsPlayed*10; j++) {
                 for (i = 0; i < 4800; i++) {
@@ -150,7 +183,7 @@ int queueSecondIfRequired(void *context){
                 }
                 __android_log_print(ANDROID_LOG_INFO, "KSS", "memory info at secondsplayed %d, position %d: sum %d", secondsPlayed, j, sum);
             }*/
-            //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
+            __android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
             memcpy(queueBuffer1, &fullTrackWavebuf[secondsPlayed * deviceSampleRate * 2], deviceSampleRate*4);
             memcpy(queueBufferSilence, (int8_t *) &fullTrackWavebuf[secondsPlayed * deviceSampleRate], deviceSampleRate);
             queueSecond = 0;
@@ -162,7 +195,7 @@ int queueSecondIfRequired(void *context){
             } // force next track for normal playback
         } else {
             if (queueBufferToUse == 2 && queueSecond != 0) {
-                //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
+                __android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second 2 ! %d", secondsPlayed);
                 memcpy(queueBuffer2, &fullTrackWavebuf[secondsPlayed * deviceSampleRate * 2], deviceSampleRate*4);
                 //if (checkForSilence(queueBuffer2)) nextTrack(context);
                 (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer2, deviceSampleRate*4);
@@ -171,7 +204,7 @@ int queueSecondIfRequired(void *context){
                 secondsPlayed++;
             } else {
                 if (queueBufferToUse == 3 && queueSecond != 0) {
-                    //__android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
+                    __android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second 3! %d", secondsPlayed);
                     memcpy(queueBuffer3, &fullTrackWavebuf[secondsPlayed * deviceSampleRate * 2], deviceSampleRate*4);
                     //if (checkForSilence(queueBuffer3)) nextTrack(context);
                     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer3, deviceSampleRate*4);
@@ -206,91 +239,128 @@ void* generateAudioThread(void* context){
     int queueSecondResult=0;
     while(1)
     {
-        if (!loopTrack || activeGameType == MUSIC_TYPE_SPC) {
+        if (!nextTrackStarted){
+            if (!loopTrack || activeGameType == MUSIC_TYPE_SPC) {
 
-            if (loopTrackWasEnabled) { //fade to next track...
-                initialDataCopied = 1;
-                secondsToGenerate = 2;
-                generatingAllowed = 1;
-                loopTrackWasEnabled = 0;
-                terminateThread = 0;
-                secondsPlayed = trackLength - 2;
-            }
-
-            isBuffering = 1;
-
-            while (secondsToGenerate > 0 && generatingAllowed == 1 && isPlaying &&
-                   secondsPlayed != trackLength && !terminateThread) {
-                if (!initialDataCopied) {
+                if (loopTrackWasEnabled) { //fade to next track...
                     initialDataCopied = 1;
-                    memcpy(fullTrackWavebuf, wavebuf, deviceSampleRate*2*2);
-                    memcpy(&fullTrackWavebuf[deviceSampleRate*2], wavebuf2, deviceSampleRate*2*2);
-                    secondsPlayed = 2;
-                    secondsToGenerate = secondsToGenerate - secondsToSkipWhenCopyingToBuffer;
+                    secondsToGenerate = 2;
+                    generatingAllowed = 1;
+                    loopTrackWasEnabled = 0;
+                    terminateThread = 0;
+                    secondsPlayed = trackLength - 2;
                 }
 
-                if (activeGameType == MUSIC_TYPE_KSS) KSSPLAY_calc(kssplay, &fullTrackWavebuf[(trackLength - secondsToGenerate) * deviceSampleRate * 2], deviceSampleRate);
-                if (activeGameType == MUSIC_TYPE_SPC || activeGameType == MUSIC_TYPE_NSF) {
-                    pthread_mutex_lock(&lock);
-                    gme_play(emu, deviceSampleRate*2, &fullTrackWavebuf[(trackLength - secondsToGenerate) * deviceSampleRate * 2]);
-                    pthread_mutex_unlock(&lock);
-                }
-                if (activeGameType == MUSIC_TYPE_VGM) FillBuffer( &fullTrackWavebuf[(trackLength - secondsToGenerate) * deviceSampleRate * 2], deviceSampleRate);
+                isBuffering = 1;
 
-                (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setBufferBarProgressId);
-                secondsToGenerate--;
-                if (secondsToGenerate == 1) {
-                    if (activeGameType == MUSIC_TYPE_KSS)
-                        KSSPLAY_fade_start(kssplay, 1000); //todo: only fade when song loops...
-                }
+                while (secondsToGenerate > 0 && generatingAllowed == 1 && isPlaying &&
+                       secondsPlayed != trackLength && !terminateThread) {
+                    /*if (!initialDataCopied) {
+                        initialDataCopied = 1;
+                        memcpy(fullTrackWavebuf, wavebuf, deviceSampleRate*2);
+                        memcpy(&fullTrackWavebuf[deviceSampleRate*2], wavebuf2, deviceSampleRate*2*2);
+                        secondsPlayed = 2;
+                        if (secondsToGenerate < secondsToSkipWhenCopyingToBuffer) secondsToGenerate = 0;
+                        else secondsToGenerate = secondsToGenerate - secondsToSkipWhenCopyingToBuffer;
+                        __android_log_print(ANDROID_LOG_INFO, "KSS", "in copy initial data, secondsToGenerate: %d", secondsToGenerate);
 
-                queueSecondResult = queueSecondIfRequired(context);
-
-                if (queueSecondResult == 1)
-                    (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
-                nextMessageSend = 0;
-            }
-            if (isPlaying) {
-                if (queueSecondIfRequired(context) == 1)
-                    (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
-            }
-            isBuffering = 0;
-            if (isPlaying && !nextMessageSend && secondsPlayed == trackLength && trackLength != 0) {
-                __android_log_print(ANDROID_LOG_INFO, "KSS", "is playing! %d %d %d %d %d", isPlaying,
-                                    nextMessageSend, secondsPlayed, trackLength, nextTrackId);
-                sleep(2);
-                (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, nextTrackId);
-
-                nextMessageSend = 1;
-            }
-        } else {
-            if (isPlaying) {
-                while (loopTrack) {
-                    loopTrackWasEnabled = 1;
-                    if (queueSecond) {
-                        queueSecond = 0;
-                        if (skipToNextTrack) {
-                            __android_log_print(ANDROID_LOG_INFO, "KSS", "Skip to next called...");
-                            skipToNextTrack = 0;
-                            (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, nextTrackId);
+                    }*/
+                    if (secondsToGenerate>0) {
+                        if (activeGameType == MUSIC_TYPE_KSS) KSSPLAY_calc(kssplay, &fullTrackWavebuf[
+                                                                                   (trackLength - secondsToGenerate) * deviceSampleRate * 2],
+                                                                           deviceSampleRate);
+                        if (activeGameType == MUSIC_TYPE_SPC || activeGameType == MUSIC_TYPE_NSF) {
+                            pthread_mutex_lock(&lock);
+                            gme_play(emu, deviceSampleRate * 2,
+                                     &fullTrackWavebuf[(trackLength - secondsToGenerate) *
+                                                       deviceSampleRate * 2]);
+                            pthread_mutex_unlock(&lock);
                         }
-                        if (queueBufferToUse == 1) {
-                            if (activeGameType == MUSIC_TYPE_KSS) KSSPLAY_calc(kssplay, queueBuffer1, deviceSampleRate);
-                            if (activeGameType == MUSIC_TYPE_VGM) FillBuffer( queueBuffer1, deviceSampleRate);
-                            (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1, deviceSampleRate*4);
-                            queueBufferToUse++;
-                            checkForSilence(queueBuffer1);
-                        } else {
-                            if (queueBufferToUse == 2) {
-                                if (activeGameType == MUSIC_TYPE_KSS) KSSPLAY_calc(kssplay, queueBuffer2, deviceSampleRate);
-                                if (activeGameType == MUSIC_TYPE_VGM) FillBuffer( queueBuffer2, deviceSampleRate);
-                                (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer2, deviceSampleRate*4);
+                        if (activeGameType == MUSIC_TYPE_VGM) {
+                            pthread_mutex_lock(&lock);
+                            FillBuffer(&fullTrackWavebuf[(trackLength - secondsToGenerate) *
+                                                         deviceSampleRate * 2], deviceSampleRate);
+                            __android_log_print(ANDROID_LOG_INFO, "KSS", "Creating vgm data...");
+                            pthread_mutex_unlock(&lock);
+                        }
+                        if (activeGameType == MUSIC_TYPE_TRACKERS) {
+                            pthread_mutex_lock(&lock);
+                            __android_log_print(ANDROID_LOG_INFO, "KSS", "Creating tracker data...");
+                            duh_render_int(streamer.renderer, &streamer.sig_samples,
+                                           &streamer.sig_samples_size, settings.bits, settings.is_unsigned, settings.volume,
+                                           streamer.delta, 48000, &fullTrackWavebuf[(trackLength - secondsToGenerate) *
+                                                                                    deviceSampleRate * 2]);
+                            pthread_mutex_unlock(&lock);
+                        }
+                    }
+
+                    (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setBufferBarProgressId);
+                    secondsToGenerate--;
+                    if (secondsToGenerate == 3) {
+                        if (activeGameType == MUSIC_TYPE_KSS)
+                            KSSPLAY_fade_start(kssplay, 1000); //todo: only fade when song loops...
+                    }
+
+                    queueSecondResult = queueSecondIfRequired(context);
+
+                    if (queueSecondResult == 1)
+                        (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
+                    nextMessageSend = 0;
+                }
+                if (isPlaying) {
+                    if (queueSecondIfRequired(context) == 1)
+                        (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
+                }
+                isBuffering = 0;
+               // __android_log_print(ANDROID_LOG_INFO, "KSS", "next maybe?! isPlaying %d nextMessageSend %d SecondsPlayed %d tracklength %d nexttrackid %d", isPlaying,nextMessageSend, secondsPlayed, trackLength, nextTrackId);
+                if (isPlaying && !nextMessageSend && secondsPlayed +1 == trackLength && trackLength != 0) {
+                    __android_log_print(ANDROID_LOG_INFO, "KSS", "yep, next!!!");
+                    sleep(1);
+                    (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, nextTrackId);
+
+                    nextMessageSend = 1;
+                    //(*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PAUSED);
+                    //(*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_STOPPED);
+                }
+            } else {
+                if (isPlaying) {
+                    while (loopTrack) {
+                        loopTrackWasEnabled = 1;
+                        if (queueSecond) {
+                            queueSecond = 0;
+                            if (skipToNextTrack) {
+                                __android_log_print(ANDROID_LOG_INFO, "KSS", "Skip to next called...");
+                                skipToNextTrack = 0;
+                                (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, nextTrackId);
+                                break;
+                            }
+                            if (queueBufferToUse == 1) {
+                                if (activeGameType == MUSIC_TYPE_KSS)
+                                    KSSPLAY_calc(kssplay, queueBuffer1, deviceSampleRate);
+                                if (activeGameType == MUSIC_TYPE_VGM)
+                                    FillBuffer(queueBuffer1, deviceSampleRate);
+                                (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer1,
+                                                                deviceSampleRate * 4);
                                 queueBufferToUse++;
+                                checkForSilence(queueBuffer1);
                             } else {
-                                if (activeGameType == MUSIC_TYPE_KSS) KSSPLAY_calc(kssplay, queueBuffer3, deviceSampleRate);
-                                if (activeGameType == MUSIC_TYPE_VGM) FillBuffer( queueBuffer3, deviceSampleRate);
-                                (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer3, deviceSampleRate*4);
-                                queueBufferToUse=1;
+                                if (queueBufferToUse == 2) {
+                                    if (activeGameType == MUSIC_TYPE_KSS)
+                                        KSSPLAY_calc(kssplay, queueBuffer2, deviceSampleRate);
+                                    if (activeGameType == MUSIC_TYPE_VGM)
+                                        FillBuffer(queueBuffer2, deviceSampleRate);
+                                    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer2,
+                                                                    deviceSampleRate * 4);
+                                    queueBufferToUse++;
+                                } else {
+                                    if (activeGameType == MUSIC_TYPE_KSS)
+                                        KSSPLAY_calc(kssplay, queueBuffer3, deviceSampleRate);
+                                    if (activeGameType == MUSIC_TYPE_VGM)
+                                        FillBuffer(queueBuffer3, deviceSampleRate);
+                                    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer3,
+                                                                    deviceSampleRate * 4);
+                                    queueBufferToUse = 1;
+                                }
                             }
                         }
                     }
@@ -372,7 +442,20 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
 
     const char *utf8File = (*env)->GetStringUTFChars(env, file, NULL);
 
+    nextTrackStarted = 0;
+
+    free(wavebuf);
+    free(wavebuf2);
+    wavebuf = malloc(deviceSampleRate * 2 * sizeof(int16_t));
+    wavebuf2 = malloc(deviceSampleRate * 2 * sizeof(int16_t));
+
     secondsToSkipWhenCopyingToBuffer = 2;
+
+    bool run;
+    char *buffer;
+    int read_samples;
+    int read_bytes;
+
 
     if (isPlaying || firstRun) {
         firstRun = 0;
@@ -423,6 +506,29 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
                 CloseVGMFile();
                 VGMPlay_Deinit();
                 break;
+            case 4:
+                memset(&streamer, 0, sizeof(streamer_t));
+                memset(&settings, 0, sizeof(settings_t));
+
+                settings.freq = deviceSampleRate;
+                settings.n_channels = 2;
+                settings.bits = 16;
+                settings.endianness = DUMB_LITTLE_ENDIAN;
+                settings.is_unsigned = false;
+                settings.volume = 1.0f;
+                settings.delay = 0.0f;
+                settings.quality = DUMB_RQ_CUBIC;
+
+                __android_log_print(ANDROID_LOG_INFO, "PlayerEngine", "Loading %s.xm", utf8File);
+
+                memset(&streamer, 0, sizeof(streamer_t));
+                dumb_register_stdfiles();
+                streamer.src = dumb_load_any(utf8File, 0, 0);
+                streamer.renderer =
+                        duh_start_sigrenderer(streamer.src, 0, settings.n_channels, 0);
+                streamer.delta = 65536.0f / settings.freq;
+                streamer.bufsize = 4096 * (settings.bits / 8) * settings.n_channels;
+
         }
 
         //pthread_mutex_unlock(&lock);
@@ -444,8 +550,13 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
 
     globalTrackNumber = trackNr;
 
-    if (!isPaused)
+    if (!isPaused || nextMessageSend) {
+        __android_log_print(ANDROID_LOG_INFO, "KSS", "Oe activating playing again... %s", utf8File);
+        pthread_mutex_lock(&lock);
         (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
+        nextMessageSend = 0;
+        pthread_mutex_unlock(&lock);
+    }
 
     if (musicType == MUSIC_TYPE_SPC) trackNr = 0; // since nsf requires track numbers and spc must be 0 and same player engine is used, reset trackNr...
 
@@ -489,13 +600,29 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
             PlayVGM();
 
             FillBuffer(wavebuf, deviceSampleRate);
-            FillBuffer(wavebuf2, deviceSampleRate);
+            if (trackLength>1) FillBuffer(wavebuf2, deviceSampleRate);
 
             break;
+
+        case 4:
+            run = true;
+            trackLength=100;
+            __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_Glue", "Track length %d\n", duh_get_length(streamer.src));
+            //*buffer = malloc(streamer.bufsize);
+
+            read_samples =
+                    duh_render_int(streamer.renderer, &streamer.sig_samples,
+                                   &streamer.sig_samples_size, settings.bits, settings.is_unsigned, settings.volume,
+                                   streamer.delta, 48000, wavebuf);
+            duh_render_int(streamer.renderer, &streamer.sig_samples,
+                             &streamer.sig_samples_size, settings.bits, settings.is_unsigned, settings.volume,
+                             streamer.delta, 48000, wavebuf2);
     }
 
-    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf, deviceSampleRate*4); //16 bit = 2x, 2 channels = 2x, so *4
-    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf2, deviceSampleRate*4);
+    (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf, deviceSampleRate*4); //16 bit = 2 bytes, 2 channels = 2x, so *4
+    if (trackLength>1) (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf2, deviceSampleRate*4);
+
+    nextTrackStarted = 0;
 
     isPlaying = 1;
 }

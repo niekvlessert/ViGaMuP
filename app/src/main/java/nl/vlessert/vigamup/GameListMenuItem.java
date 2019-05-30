@@ -10,8 +10,8 @@ public class GameListMenuItem extends Game {
     private boolean morePlatformsAfter = false;
     private boolean morePlatformsBefore = false;
 
-    public GameListMenuItem(String gameName, int musicType, Context ctx, int position){
-        super(gameName, musicType, ctx, position);
+    public GameListMenuItem(String gameName, int musicType, int position, String musicFileExtension){
+        super(gameName, musicType, position, musicFileExtension);
     }
 
     @Override
