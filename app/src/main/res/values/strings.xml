@@ -26,4 +26,7 @@
     <string-array name="Games">
         <item>None...</item>
     </string-array>
+
+    <string name="SCC_collection"><b>Konami SCC collection</b>\nGreat music, all from the MSX system.</string>
+
 </resources>

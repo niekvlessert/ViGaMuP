@@ -1,0 +1,28 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/SCC"
+        style="@android:style/Widget.Button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="10"
+        android:includeFontPadding="false"
+        android:paddingTop="2pt"
+        android:paddingBottom="5pt"
+        />
+
+    <TextView
+        android:id="@+id/Plok"
+        style="@android:style/Widget.Button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="10"
+        android:includeFontPadding="false"
+        android:paddingTop="2pt"
+        android:paddingBottom="5pt"
+        />
+</LinearLayout>

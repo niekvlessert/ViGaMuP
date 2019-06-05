@@ -77,6 +77,8 @@ public class PlayerService extends Service{
     private String currentLogoFile = "";
     private int currentBigViewType = Constants.BIG_VIEW_TYPES.SQUARE;
 
+    private boolean unzipping = false;
+
     static {
         System.loadLibrary("player_engine");
     }
@@ -717,7 +719,8 @@ public class PlayerService extends Service{
         updateA2DPInfo();
         setPlayingStatePlaying();
 
-        if (paused) paused = togglePlayback();
+        if (paused) paused = togglePlayback(); else unzipping = false;
+        //sendBroadcast(new Intent("resetSeekBar"));
     }
 
     public void playCurrentTrack() {
@@ -733,6 +736,7 @@ public class PlayerService extends Service{
                 game.extractCurrentSpcTrackfromRSN();
                 break;
             case Constants.PLATFORM.VGM:
+                unzipping = true;
                 game.extractCurrentVgmTrackfromZip();
                 return;
                 //break;
@@ -781,6 +785,7 @@ public class PlayerService extends Service{
                     //startSpcPlayback(game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackLength());
                     break;
                 case Constants.PLATFORM.VGM:
+                    unzipping = true;
                     game.extractCurrentVgmTrackfromZip();
                     break;
             }
@@ -979,10 +984,12 @@ public class PlayerService extends Service{
     }
 
     private void setSeekBarThumbProgress(){ // used from ndk..
-        secondsPlayedFromCurrentTrack++;
-        Intent intent = new Intent("setSeekBarThumbProgress");
-        intent.putExtra("SEEKBAR_PROGRESS_SECONDS",secondsPlayedFromCurrentTrack);
-        sendBroadcast(intent);
+        if (!unzipping) {
+            secondsPlayedFromCurrentTrack++;
+            Intent intent = new Intent("setSeekBarThumbProgress");
+            intent.putExtra("SEEKBAR_PROGRESS_SECONDS", secondsPlayedFromCurrentTrack);
+            sendBroadcast(intent);
+        }
     }
 
     public void setProgressJava(int progress){

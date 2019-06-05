@@ -320,6 +320,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                 if (intent.getAction().equals("setSeekBarThumbProgress")) setSeekBarThumbProgress(intent.getIntExtra("SEEKBAR_PROGRESS_SECONDS",0));
                 if (intent.getAction().equals("resetSeekBar")) {
                     seekBar.setMax(mPlayerService.getCurrentTrackLength());
+                    mPlayerService.setProgressJava(0);
                     bufferBarProgress = 2; // 2 seconds buffered always in advance...
                     seekBarThumbProgress = 0;
                     seekBar.setProgress(0);
@@ -511,6 +512,9 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
             case R.id.download_music:
                 downloadMusic();
                 return true;
+            case R.id.download_essentials:
+                downloadEssentials();
+                return true;
             case R.id.download_vgmrips:
                 downloadVGMRips();
                 return true;
@@ -608,6 +612,46 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
         Log.d("vigamup result", "result: " + resultCode);
         IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+        if (resultCode == 1338) { //Essential downloads...
+            String name = data.getStringExtra("DownloadedFile");
+            Log.d(LOG_TAG, "Essentials download in main acitivity:" + name);
+            File file = new File(name);
+            File targetDirectory = new File(name.substring(0, name.lastIndexOf("/")));
+            if (name.contains("vigamup")) { //should be zip..
+                try {
+                    helpers.unzip(file, targetDirectory);
+                    Log.d(LOG_TAG, "Unzipped...");
+                    boolean deleted = file.delete();
+                    if (checkForMusicAndInitialize()) {
+                        forceRecreateGameCollection = true;
+                        showMusicList();
+                    }
+                    //recreate();
+                } catch (IOException test) {
+                    Log.d(LOG_TAG, "Unzip error... very weird");
+                }
+            }
+            if (name.contains("rsn")) { // must be snesmusic.. enqueue image download here... ugly, but don't want to find out multiple downloading as of yet..
+                String game = name.substring(name.lastIndexOf("/")+1, name.lastIndexOf("."));
+                String fileNameImage = "http://snesmusic.org/v2/images/screenshots/"+game+".png";
+                Uri Download_Uri2 = Uri.parse(fileNameImage);
+                DownloadManager.Request request2 = new DownloadManager.Request(Download_Uri2);
+                request2.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
+                request2.setAllowedOverRoaming(false);
+                //request2.setTitle(intent.getStringExtra(fileNameImage));
+                request2.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/SPC/" + game + ".png");
+                downloadReference = downloadManager.enqueue(request2);
+
+                Thread t = new Thread(new SpcTrackInfoGenerator(mPlayerService, game+".rsn", getApplicationContext()));
+                t.start();
+                try { t.join(); } catch (InterruptedException e) { e.printStackTrace(); }
+                recreate();
+                if (checkForMusicAndInitialize()) {
+                    forceRecreateGameCollection = true;
+                    showMusicList();
+                }
+            }
+        }
         if (resultCode == 1337) {
             Log.d(LOG_TAG, "Generating vgmrips gameinfo!!!");
             String name = data.getStringExtra("DownloadedFile");
@@ -769,7 +813,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
     }
 
     private void unpackDownloadedFile(Context context, Intent intent){
-        //Log.d(LOG_TAG,"Download event!!!!");
+        Log.d(LOG_TAG,"unpackDownloadedFile Download event!!!!");
         String action = intent.getAction();
         //Log.d("vigamup download result", action + ", " + downloadReference);
         if (DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(action)){// && downloadReference!=null) {
@@ -783,6 +827,8 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
             Bundle extras = intent.getExtras();
             q.setFilterById(extras.getLong(DownloadManager.EXTRA_DOWNLOAD_ID));
             Cursor c = manager.query(q);
+
+            Log.d(LOG_TAG, "hier zijn we dan!!!");
 
             if (c.moveToFirst()) {
                 int status = c.getInt(c.getColumnIndex(DownloadManager.COLUMN_STATUS));
@@ -1122,6 +1168,11 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
     private void downloadVGMRips(){
         Intent intent = new Intent(this, VGMRipsDownloaderActivity.class);
         startActivityForResult(intent, 1337);
+    }
+
+    private void downloadEssentials(){
+        Intent intent = new Intent(this, EssentialsDownloaderActivity.class);
+        startActivityForResult(intent, 1338);
     }
 
     public static void increaseClickArea(View parent, View child) {

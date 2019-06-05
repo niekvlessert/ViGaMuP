@@ -32,6 +32,7 @@
         <service android:name=".PlayerService"></service>
 
         <activity android:name=".VGMRipsDownloaderActivity"></activity>
+        <activity android:name=".EssentialsDownloaderActivity"></activity>
     </application>
 
 </manifest>

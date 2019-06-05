@@ -13,6 +13,11 @@
         android:title="Download Music with QR"
         app:showAsAction="never" />
     <item
+        android:id="@+id/download_essentials"
+        android:orderInCategory="100"
+        android:title="Download Some Essential packs"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/download_vgmrips"
         android:orderInCategory="100"
         android:title="Download from vgmrips.net"
