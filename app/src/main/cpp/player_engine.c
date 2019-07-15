@@ -12,6 +12,7 @@
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
 #include <malloc.h>
+#include <tgmath.h>
 
 
 #include "libkss/src/kssplay.h"
@@ -266,30 +267,26 @@ void* generateAudioThread(void* context){
 
                     }*/
                     if (secondsToGenerate>0) {
-                        if (activeGameType == MUSIC_TYPE_KSS) KSSPLAY_calc(kssplay, &fullTrackWavebuf[
-                                                                                   (trackLength - secondsToGenerate) * deviceSampleRate * 2],
-                                                                           deviceSampleRate);
+                        if (activeGameType == MUSIC_TYPE_KSS) KSSPLAY_calc(kssplay, &fullTrackWavebuf[(trackLength - secondsToGenerate) * deviceSampleRate * 2],deviceSampleRate);
+
                         if (activeGameType == MUSIC_TYPE_SPC || activeGameType == MUSIC_TYPE_NSF) {
                             pthread_mutex_lock(&lock);
-                            gme_play(emu, deviceSampleRate * 2,
-                                     &fullTrackWavebuf[(trackLength - secondsToGenerate) *
-                                                       deviceSampleRate * 2]);
+                            gme_play(emu, deviceSampleRate * 2,&fullTrackWavebuf[(trackLength - secondsToGenerate) * deviceSampleRate * 2]);
                             pthread_mutex_unlock(&lock);
                         }
+
                         if (activeGameType == MUSIC_TYPE_VGM) {
                             pthread_mutex_lock(&lock);
-                            FillBuffer(&fullTrackWavebuf[(trackLength - secondsToGenerate) *
-                                                         deviceSampleRate * 2], deviceSampleRate);
+                            FillBuffer(&fullTrackWavebuf[(trackLength - secondsToGenerate) *deviceSampleRate * 2], deviceSampleRate);
                             __android_log_print(ANDROID_LOG_INFO, "KSS", "Creating vgm data...");
                             pthread_mutex_unlock(&lock);
                         }
+
                         if (activeGameType == MUSIC_TYPE_TRACKERS) {
                             pthread_mutex_lock(&lock);
                             __android_log_print(ANDROID_LOG_INFO, "KSS", "Creating tracker data...");
-                            duh_render_int(streamer.renderer, &streamer.sig_samples,
-                                           &streamer.sig_samples_size, settings.bits, settings.is_unsigned, settings.volume,
-                                           streamer.delta, 48000, &fullTrackWavebuf[(trackLength - secondsToGenerate) *
-                                                                                    deviceSampleRate * 2]);
+                            duh_render_int(streamer.renderer, &streamer.sig_samples,&streamer.sig_samples_size, settings.bits, settings.is_unsigned, settings.volume,streamer.delta, deviceSampleRate, &fullTrackWavebuf[(trackLength - secondsToGenerate) * deviceSampleRate * 2]);
+                            //duh_render_int(streamer.renderer, &streamer.sig_samples,&streamer.sig_samples_size, settings.bits, settings.is_unsigned, settings.volume,streamer.delta, deviceSampleRate, wavebuf);
                             pthread_mutex_unlock(&lock);
                         }
                     }
@@ -606,17 +603,13 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
 
         case 4:
             run = true;
-            trackLength=100;
-            __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_Glue", "Track length %d\n", duh_get_length(streamer.src));
+            //trackLength=round(duh_get_length(streamer.src)/65535);
+            trackLength=90;
+            __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_Glue", "Track length %d\n", trackLength);
             //*buffer = malloc(streamer.bufsize);
 
-            read_samples =
-                    duh_render_int(streamer.renderer, &streamer.sig_samples,
-                                   &streamer.sig_samples_size, settings.bits, settings.is_unsigned, settings.volume,
-                                   streamer.delta, 48000, wavebuf);
-            duh_render_int(streamer.renderer, &streamer.sig_samples,
-                             &streamer.sig_samples_size, settings.bits, settings.is_unsigned, settings.volume,
-                             streamer.delta, 48000, wavebuf2);
+            duh_render_int(streamer.renderer, &streamer.sig_samples,&streamer.sig_samples_size, settings.bits, settings.is_unsigned, settings.volume,streamer.delta, deviceSampleRate, wavebuf);
+            duh_render_int(streamer.renderer, &streamer.sig_samples,&streamer.sig_samples_size, settings.bits, settings.is_unsigned, settings.volume,streamer.delta, deviceSampleRate, wavebuf2);
     }
 
     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, wavebuf, deviceSampleRate*4); //16 bit = 2 bytes, 2 channels = 2x, so *4
