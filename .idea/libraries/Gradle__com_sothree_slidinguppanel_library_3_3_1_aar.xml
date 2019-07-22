@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Gradle: com.sothree.slidinguppanel:library:3.3.1@aar">
+    <CLASSES>
+      <root url="file://$USER_HOME$/.gradle/caches/transforms-2/files-2.1/71810529b0cf0274b91870e96e0f21cb/res" />
+      <root url="jar://$USER_HOME$/.gradle/caches/transforms-2/files-2.1/71810529b0cf0274b91870e96e0f21cb/jars/classes.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.sothree.slidinguppanel/library/3.3.1/5426d69e908860a944b294f6f2a7fd9799b1ac50/library-3.3.1-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

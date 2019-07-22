@@ -64,7 +64,9 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -673,10 +675,63 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
             }
             if (name.contains("tracker")) {
                 Log.d(LOG_TAG, "trackers essentials found");
+                int trackNr = 1;
+
                 try {
-                    File targetDirectory = new File("/storage/emulated/0/Download/ViGaMuP/Trackers");
-                    helpers.unzip(file, targetDirectory);
-                    Log.d(LOG_TAG, "Unzipped in " + targetDirectory.toString());
+                    //File targetDirectory = new File("/storage/emulated/0/Download/ViGaMuP/Trackers");
+                    File destinationFolder = new File(Constants.vigamupDirectory+"tmp/tracker_tmp");
+
+                    if (helpers.directoryExists("tmp/tracker_tmp")){
+                        helpers.deleteAllFilesInDirectory(("tmp/tracker_tmp"));
+                    } else {
+                        helpers.makeDirectory("tmp/tracker_tmp");
+                    }
+
+                    helpers.unzip(file, destinationFolder);
+                    Log.d(LOG_TAG, "Unzipped in " + destinationFolder.toString());
+
+                    String trackerfileName, extension;
+                    for (int counter = 0; counter < helpers.extracted_files.size(); counter++) {
+                        trackerfileName = helpers.extracted_files.get(counter).toString();
+                        extension = trackerfileName.substring(trackerfileName.lastIndexOf(".")+1);
+                        Log.d(LOG_TAG, "filename: "+trackerfileName + ",extension: "+extension);
+
+                        byte[] buffer = new byte[30];
+                        InputStream is = new FileInputStream("/storage/emulated/0/Download/ViGaMuP/tmp/tracker_tmp/" + trackerfileName);
+                        String title;
+                        if (is.read(buffer) != buffer.length) {
+                            Log.d(LOG_TAG, "blaat");
+                        }
+                        title = new String(buffer);
+                        Log.d(LOG_TAG, "buffer:" + title);
+
+                        is.close();
+                        switch(extension){
+                            case "it":
+                                break;
+                            case "s3m":
+                                break;
+                            case "mod":
+                                break;
+                            case "xm":
+                                break;
+                            default:
+                                break;
+                        }
+                        int trackLength = 90;//fix
+                        String baseGameName = name.substring(name.lastIndexOf("/"),name.lastIndexOf("."));
+                        File trackinfoFile = new File(Constants.vigamupDirectory+"VGM/"+baseGameName+".trackinfo");
+                        FileWriter fWriter = new FileWriter(trackinfoFile, true);
+                        File gameinfoFile = new File(Constants.vigamupDirectory+"VGM/"+baseGameName+".gameinfo");
+                        FileWriter fWriter2 = new FileWriter(trackinfoFile, true);
+                        fWriter.write(Integer.toString(trackNr)+ "," + title.replace(",", "") + "," + trackLength + ",,," + trackerfileName + "\n");
+
+
+                        //create a txt file with filename, title, length from every file in there in Trackers directory. Filename similar to zip file but with .txt
+                        //Do we need c for that?
+
+                        //Remove tmp files and directory
+                    }
                 } catch (IOException test) {
                     Log.d(LOG_TAG, "Unzip error... very weird");
                 }

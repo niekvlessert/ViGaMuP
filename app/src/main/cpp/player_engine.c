@@ -1022,3 +1022,15 @@ jbyteArray Java_nl_vlessert_vigamup_PlayerService_generateSpcTrackInformation(JN
 
 }
 
+jbyteArray Java_nl_vlessert_vigamup_PlayerService_generateTrackerTrackInformation(JNIEnv* env, jclass clazz, char *file) {
+
+    const char *utf8File = (*env)->GetStringUTFChars(env, file, NULL);
+    char fullPath[1024];
+    char trackerInfoString[1024];
+    char length[5];
+    char loopLength[5];
+    int doThisTrack = 0;
+    jbyteArray Array;
+    Array = (*env)->NewByteArray(env, 1024);
+}
+

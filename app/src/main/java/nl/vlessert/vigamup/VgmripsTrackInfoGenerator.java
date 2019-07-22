@@ -27,7 +27,7 @@ public class VgmripsTrackInfoGenerator implements Runnable{
 
     @Override
     public void run() {
-        String vgmTrackInfo;
+        //String vgmTrackInfo;
         helpers = new HelperFunctions();
         String baseGameName = zipFile.substring(0, zipFile.indexOf("."));
         int trackNr = 1;
