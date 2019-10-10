@@ -9,6 +9,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -145,7 +146,9 @@ public class HelperFunctions {
         }
     }
 
-    public static void unzip(File zipFile, File targetDirectory) throws IOException {
+    public ArrayList extracted_files = new ArrayList();
+
+    public  void unzip(File zipFile, File targetDirectory) throws IOException {
         ZipInputStream zis = new ZipInputStream(
                 new BufferedInputStream(new FileInputStream(zipFile)));
         try {
@@ -155,6 +158,7 @@ public class HelperFunctions {
             while ((ze = zis.getNextEntry()) != null) {
                 File file = new File(targetDirectory, ze.getName());
                 Log.d("vigamup", ze.getName());
+                extracted_files.add(ze.getName());
                 File dir = ze.isDirectory() ? file : file.getParentFile();
                 if (!dir.isDirectory() && !dir.mkdirs())
                     throw new FileNotFoundException("Failed to ensure directory: " +

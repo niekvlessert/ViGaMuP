@@ -4,11 +4,11 @@ android {
     compileSdkVersion 28
     buildToolsVersion '28.0.3'
     defaultConfig {
-        applicationId "nl.vlessert.vigamup"
+        applicationId "nl.vlessert.vigamup2"
         minSdkVersion 19
         targetSdkVersion 28
-        versionCode 6
-        versionName "1.5"
+        versionCode 9
+        versionName "1.72"
         multiDexEnabled true
         externalNativeBuild {
             cmake {

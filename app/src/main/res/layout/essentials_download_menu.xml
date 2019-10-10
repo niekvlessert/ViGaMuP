@@ -16,7 +16,18 @@
         />
 
     <TextView
-        android:id="@+id/Plok"
+        android:id="@+id/SNES_1"
+        style="@android:style/Widget.Button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="10"
+        android:includeFontPadding="false"
+        android:paddingTop="2pt"
+        android:paddingBottom="5pt"
+        />
+
+    <TextView
+        android:id="@+id/TRACKERS_1"
         style="@android:style/Widget.Button"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

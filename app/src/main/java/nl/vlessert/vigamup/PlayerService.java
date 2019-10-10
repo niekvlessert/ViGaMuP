@@ -1018,5 +1018,6 @@ public class PlayerService extends Service{
 
     public native void generateTrackInformation();
     public native byte[] generateSpcTrackInformation(String spcFile);
+    public native byte[] generateTrackerTrackInformation(String trackerFile);
 
 }

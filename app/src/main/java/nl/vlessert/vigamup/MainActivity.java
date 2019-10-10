@@ -64,7 +64,9 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -509,9 +511,6 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
             //case R.id.action_settings:
                 //Toast.makeText(getApplicationContext(), "Item 1 Selected", Toast.LENGTH_LONG).show();
                 //return true;
-            case R.id.download_music:
-                downloadMusic();
-                return true;
             case R.id.download_essentials:
                 downloadEssentials();
                 return true;
@@ -612,12 +611,14 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
         Log.d("vigamup result", "result: " + resultCode);
         IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+
         if (resultCode == 1338) { //Essential downloads...
             String name = data.getStringExtra("DownloadedFile");
             Log.d(LOG_TAG, "Essentials download in main acitivity:" + name);
             File file = new File(name);
-            File targetDirectory = new File(name.substring(0, name.lastIndexOf("/")));
             if (name.contains("vigamup")) { //should be zip..
+                File targetDirectory = new File(name.substring(0, name.lastIndexOf("/")));
+
                 try {
                     helpers.unzip(file, targetDirectory);
                     Log.d(LOG_TAG, "Unzipped...");
@@ -631,28 +632,112 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     Log.d(LOG_TAG, "Unzip error... very weird");
                 }
             }
-            if (name.contains("rsn")) { // must be snesmusic.. enqueue image download here... ugly, but don't want to find out multiple downloading as of yet..
-                String game = name.substring(name.lastIndexOf("/")+1, name.lastIndexOf("."));
-                String fileNameImage = "http://snesmusic.org/v2/images/screenshots/"+game+".png";
-                Uri Download_Uri2 = Uri.parse(fileNameImage);
-                DownloadManager.Request request2 = new DownloadManager.Request(Download_Uri2);
-                request2.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
-                request2.setAllowedOverRoaming(false);
-                //request2.setTitle(intent.getStringExtra(fileNameImage));
-                request2.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/SPC/" + game + ".png");
-                downloadReference = downloadManager.enqueue(request2);
+            if (name.contains("snes")) {
+                Log.d(LOG_TAG, "snes essentials found");
+                try {
+                    File targetDirectory = new File("/storage/emulated/0/Download/ViGaMuP/SPC");
+                    helpers.unzip(file, targetDirectory);
+                    Log.d(LOG_TAG, "Unzipped in " + targetDirectory.toString());
+                    //Log.d(LOG_TAG, "hmm: " + helpers.extracted_files.get(0));
+                    String rsn_name;
+                    for (int counter = 0; counter < helpers.extracted_files.size(); counter++) {
+                        rsn_name = helpers.extracted_files.get(counter).toString();
+                        if (rsn_name.substring(rsn_name.lastIndexOf(".")).equals(".rsn")) {
+                            String game = rsn_name.substring(0, rsn_name.lastIndexOf("."));
+                            String fileNameImage = "http://snesmusic.org/v2/images/screenshots/" + game + ".png";
+                            Log.d(LOG_TAG, "Trying to download from: " + fileNameImage + ", coming from game: " + game + ", which is based on rsn_name: " + rsn_name);
+                            Uri Download_Uri2 = Uri.parse(fileNameImage);
+                            DownloadManager.Request request2 = new DownloadManager.Request(Download_Uri2);
+                            request2.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
+                            request2.setAllowedOverRoaming(false);
+                            //request2.setTitle(intent.getStringExtra(fileNameImage));
+                            request2.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ViGaMuP/SPC/" + game + ".png");
+                            downloadReference = downloadManager.enqueue(request2);
 
-                Thread t = new Thread(new SpcTrackInfoGenerator(mPlayerService, game+".rsn", getApplicationContext()));
-                t.start();
-                try { t.join(); } catch (InterruptedException e) { e.printStackTrace(); }
-                recreate();
-                if (checkForMusicAndInitialize()) {
-                    forceRecreateGameCollection = true;
-                    showMusicList();
+                            Thread t = new Thread(new SpcTrackInfoGenerator(mPlayerService, rsn_name, getApplicationContext()));
+                            t.start();
+                            try {
+                                t.join();
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                    file.delete();
+                    if (checkForMusicAndInitialize()) {
+                        forceRecreateGameCollection = true;
+                        showMusicList();
+                    }
+                    //recreate();
+                } catch (IOException test) {
+                    Log.d(LOG_TAG, "Unzip error... very weird");
+                }
+            }
+            if (name.contains("tracker")) {
+                Log.d(LOG_TAG, "trackers essentials found");
+                int trackNr = 1;
+
+                try {
+                    //File targetDirectory = new File("/storage/emulated/0/Download/ViGaMuP/Trackers");
+                    File destinationFolder = new File(Constants.vigamupDirectory+"tmp/tracker_tmp");
+
+                    if (helpers.directoryExists("tmp/tracker_tmp")){
+                        helpers.deleteAllFilesInDirectory(("tmp/tracker_tmp"));
+                    } else {
+                        helpers.makeDirectory("tmp/tracker_tmp");
+                    }
+
+                    helpers.unzip(file, destinationFolder);
+                    Log.d(LOG_TAG, "Unzipped in " + destinationFolder.toString());
+
+                    String trackerfileName, extension;
+                    for (int counter = 0; counter < helpers.extracted_files.size(); counter++) {
+                        trackerfileName = helpers.extracted_files.get(counter).toString();
+                        extension = trackerfileName.substring(trackerfileName.lastIndexOf(".")+1);
+                        Log.d(LOG_TAG, "filename: "+trackerfileName + ",extension: "+extension);
+
+                        byte[] buffer = new byte[30];
+                        InputStream is = new FileInputStream("/storage/emulated/0/Download/ViGaMuP/tmp/tracker_tmp/" + trackerfileName);
+                        String title;
+                        if (is.read(buffer) != buffer.length) {
+                            Log.d(LOG_TAG, "blaat");
+                        }
+                        title = new String(buffer);
+                        Log.d(LOG_TAG, "buffer:" + title);
+
+                        is.close();
+                        switch(extension){
+                            case "it":
+                                break;
+                            case "s3m":
+                                break;
+                            case "mod":
+                                break;
+                            case "xm":
+                                break;
+                            default:
+                                break;
+                        }
+                        int trackLength = 90;//fix
+                        String baseGameName = name.substring(name.lastIndexOf("/"),name.lastIndexOf("."));
+                        File trackinfoFile = new File(Constants.vigamupDirectory+"VGM/"+baseGameName+".trackinfo");
+                        FileWriter fWriter = new FileWriter(trackinfoFile, true);
+                        File gameinfoFile = new File(Constants.vigamupDirectory+"VGM/"+baseGameName+".gameinfo");
+                        FileWriter fWriter2 = new FileWriter(trackinfoFile, true);
+                        fWriter.write(Integer.toString(trackNr)+ "," + title.replace(",", "") + "," + trackLength + ",,," + trackerfileName + "\n");
+
+
+                        //create a txt file with filename, title, length from every file in there in Trackers directory. Filename similar to zip file but with .txt
+                        //Do we need c for that?
+
+                        //Remove tmp files and directory
+                    }
+                } catch (IOException test) {
+                    Log.d(LOG_TAG, "Unzip error... very weird");
                 }
             }
         }
-        if (resultCode == 1337) {
+        if (resultCode == 1337) { //normal download, can probably be deleted soon since camera function is gone. Have to move vgm stuff though
             Log.d(LOG_TAG, "Generating vgmrips gameinfo!!!");
             String name = data.getStringExtra("DownloadedFile");
             String game = name.substring(name.lastIndexOf("/") + 1);
@@ -868,11 +953,11 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                         rebuildMusicList = true;
                         return;
                     }
-                    /*if (checkForMusicAndInitialize()) {
+                    if (checkForMusicAndInitialize()) {
                         mPlayerService.createGameCollection();
                         gamesShowing=false;
                         showMusicList();
-                    }*/
+                    }
                     Toast.makeText(getApplicationContext(), "Download completed...", Toast.LENGTH_LONG).show();
                     if (name.contains("rsn")) { // must be snesmusic.. enqueue image download here... ugly, but don't want to find out multiple downloading as of yet..
                         String game = name.substring(name.lastIndexOf("/")+1, name.lastIndexOf("."));
@@ -950,20 +1035,26 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                 } else {
                     helpers.makeDirectory("VGM");
                 }
+                if (helpers.directoryExists("Trackers")) {
+                    if (helpers.dirSize(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/Trackers"))> 40000) musicFound = true;
+                } else {
+                    helpers.makeDirectory("Trackers");
+                }
             } else {
                 helpers.baseMakeDirectory("ViGaMuP");
                 helpers.makeDirectory("KSS");
                 helpers.makeDirectory("SPC");
                 helpers.makeDirectory("VGM");
+                helpers.makeDirectory("Trackers");
                 helpers.makeDirectory("tmp");
             }
             helpers.deleteAllFilesInDirectory("tmp/");
         }
-        //if (!musicFound) {
-            //firstRun = true;
-            //downloadMusic();
-            //return false;
-        //} else
+        if (!musicFound) {
+            firstRun = true;
+            downloadMusic();
+            return false;
+        } else
         return true;
     }
 
@@ -1139,25 +1230,16 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
     }
 
     private void downloadMusic(){
-        Log.d(LOG_TAG,"Initialize barcode scanner...");
 
         String message = "";
         if (firstRun) message = "You don't have any music! ";
-        message += "Visit vigamup.club with your PC to get some QR codes to get yourself some music! Click OK to open the QR code scanner...";
+        message += "Go download some essentials from the menu...";
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setMessage(message)
                 .setCancelable(false)
                 .setPositiveButton("OK", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
-                        //Intent intent = new Intent(getApplicationContext(), BarcodeCaptureActivity.class);
-                        //startActivityForResult(intent, BARCODE_READER_REQUEST_CODE);
-                        IntentIntegrator integrator = new IntentIntegrator(activity);
-                        integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE_TYPES);
-                        integrator.setPrompt("Scan");
-                        integrator.setCameraId(0);
-                        integrator.setBeepEnabled(false);
-                        integrator.setBarcodeImageEnabled(false);
-                        integrator.initiateScan();
+                        downloadEssentials();
                     }
                 });
         AlertDialog alert = builder.create();
