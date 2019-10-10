@@ -488,6 +488,9 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
                         return;
                     }
                     kssplay = KSSPLAY_new(deviceSampleRate, 2, 16); // so frequency (48k) * channels (1) * bitrate (16) = 96000 bytes per second
+                    KSSPLAY_set_device_quality(kssplay, EDSC_PSG, 1);
+                    KSSPLAY_set_device_quality(kssplay, EDSC_SCC, 1);
+                    KSSPLAY_set_device_quality(kssplay, EDSC_OPLL, 1);
                     KSSPLAY_set_data(kssplay, kss);
                     KSSPLAY_set_master_volume(kssplay, 80); //on 100 it will overpower when increasing OPLL volume
                     KSSPLAY_set_device_volume(kssplay, EDSC_PSG, 20); //emphasise drums (mostly)
