@@ -456,10 +456,12 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
 
     if (isPlaying || firstRun) {
         firstRun = 0;
+        __android_log_print(ANDROID_LOG_INFO, "KSS", "Ok, still playing...");
 
         isPlaying=0;
         //if (isBuffering==1) secondsToSkipWhenCopyingToBuffer = 1; // ugly fix for weird queue problem... probably some timing issue, can't find it...
         while (isBuffering){
+            __android_log_print(ANDROID_LOG_INFO, "KSS", "Still buffering...");
             usleep(100);
         }
 
@@ -503,6 +505,7 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
                 break;
             case 2:
                 StopVGM();
+                __android_log_print(ANDROID_LOG_INFO, "VGM", "Stop playback..");
                 CloseVGMFile();
                 VGMPlay_Deinit();
                 break;
@@ -550,13 +553,13 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
 
     globalTrackNumber = trackNr;
 
-    if (!isPaused || nextMessageSend) {
+    /*if (!isPaused || nextMessageSend) {
         __android_log_print(ANDROID_LOG_INFO, "KSS", "Oe activating playing again... %s", utf8File);
         pthread_mutex_lock(&lock);
         (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
         nextMessageSend = 0;
         pthread_mutex_unlock(&lock);
-    }
+    }*/
 
     if (musicType == MUSIC_TYPE_SPC) trackNr = 0; // since nsf requires track numbers and spc must be 0 and same player engine is used, reset trackNr...
 

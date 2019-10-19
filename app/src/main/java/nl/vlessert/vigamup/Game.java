@@ -352,7 +352,7 @@ public class Game {
         this.playerService = ps;
     }
 
-    public void extractCurrentVgmTrackfromZip() {
+    public void extractCurrentVgmTrackfromZipAndStartPlaybackWithCallback() {
         //String vgmFileName = getCurrentTrackFileName();
         String zipFileName = musicFileC;
         Unzipper unzipper = new Unzipper(playerService);

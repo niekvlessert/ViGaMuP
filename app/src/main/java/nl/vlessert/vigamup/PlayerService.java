@@ -1,7 +1,6 @@
 package nl.vlessert.vigamup;
 
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -641,11 +640,11 @@ public class PlayerService extends Service{
                 currentGame.extractCurrentSpcTrackfromRSN();
                 break;
             case Constants.PLATFORM.VGM:
-                currentGame.extractCurrentVgmTrackfromZip();
+                currentGame.extractCurrentVgmTrackfromZipAndStartPlaybackWithCallback();
                 break;
         }
 
-        playTrack(currentGame.getMusicType(), currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
+        if (currentGame.getMusicType()!=Constants.PLATFORM.VGM) playTrack(currentGame.getMusicType(), currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
 
         sendBroadcast(new Intent("resetSeekBar"));
         sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
@@ -695,12 +694,12 @@ public class PlayerService extends Service{
                 break;
             case Constants.PLATFORM.VGM:
                 Log.d(LOG_TAG, "In VGM extraction...");
-                currentGame.extractCurrentVgmTrackfromZip();
+                currentGame.extractCurrentVgmTrackfromZipAndStartPlaybackWithCallback();
                 return;
                 //break;
         }
 
-        playTrack(currentGame.getMusicType(), currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
+        if (currentGame.getMusicType()!=Constants.PLATFORM.VGM) playTrack(currentGame.getMusicType(), currentGame.getCurrentTrackFileNameFullPath(), currentGame.getCurrentTrackNumber(), currentGame.getCurrentTrackLength());
 
         sendBroadcast(new Intent("resetSeekBar"));
         sendBroadcast(new Intent("setSlidingUpPanelWithGame"));
@@ -737,12 +736,12 @@ public class PlayerService extends Service{
                 break;
             case Constants.PLATFORM.VGM:
                 unzipping = true;
-                game.extractCurrentVgmTrackfromZip();
+                game.extractCurrentVgmTrackfromZipAndStartPlaybackWithCallback();
                 return;
                 //break;
         }
         Log.d(LOG_TAG,"In playCurrentTrack! info: " + game.getMusicType()+" "+game.getCurrentTrackFileNameFullPath()+" "+game.getCurrentTrackNumber()+" "+game.getCurrentTrackLength());
-        playTrack(game.getMusicType(), game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+        if (currentGame.getMusicType()!=Constants.PLATFORM.VGM) playTrack(game.getMusicType(), game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackNumber(), game.getCurrentTrackLength());
 
         updateNotificationTitles();
         updateA2DPInfo();
@@ -786,10 +785,10 @@ public class PlayerService extends Service{
                     break;
                 case Constants.PLATFORM.VGM:
                     unzipping = true;
-                    game.extractCurrentVgmTrackfromZip();
+                    game.extractCurrentVgmTrackfromZipAndStartPlaybackWithCallback();
                     break;
             }
-            playTrack(game.getMusicType(), game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+            if (currentGame.getMusicType()!=Constants.PLATFORM.VGM) playTrack(game.getMusicType(), game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackNumber(), game.getCurrentTrackLength());
             alreadyPlaying = true;
         }
 
