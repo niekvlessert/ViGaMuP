@@ -6,8 +6,6 @@ import android.util.Log;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.util.regex.Pattern;
 
 public class SpcTrackInfoGenerator implements Runnable{
@@ -70,7 +68,7 @@ public class SpcTrackInfoGenerator implements Runnable{
                             fWriter2.write("composers:" + trackInfoExploded[2].replace(",", "") + "\n");
                             gameInfoWritten = true;
                         }
-                        tracks_to_play+=Integer.toString(trackNr)+",";
+                        tracks_to_play+=trackNr+",";
                     }
                     trackNr++;
                 }

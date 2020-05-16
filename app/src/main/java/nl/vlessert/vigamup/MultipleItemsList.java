@@ -171,7 +171,6 @@ public class MultipleItemsList extends ListFragment {
                         holder.textView2.setText("Other platforms");
                         break;
                 }
-                //holder.textView2.setText("tekst");
                 convertView.setTag(holder);
                 return convertView;
             }
@@ -213,6 +212,7 @@ public class MultipleItemsList extends ListFragment {
                             if (composers.length()>0) information = information.concat("\n"+ composers);
                         }
                     }
+                    Log.d(LOG_TAG, "information:" + information);
                     holder.textView2.setText(information);
 
                     break;

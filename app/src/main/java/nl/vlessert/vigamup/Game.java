@@ -90,19 +90,16 @@ public class Game {
             this.position = position;
 
             if (musicType == Constants.PLATFORM.NSF) readInfoFromNSF(gameName);
-            if (musicType == Constants.PLATFORM.TRACKERS) addTrackerTrack(gameName);
 
             switch (musicType){
                 case Constants.PLATFORM.KSS:
                 case Constants.PLATFORM.SPC:
                 case Constants.PLATFORM.VGM:
+                case Constants.PLATFORM.TRACKERS:
                     readGameInfo(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".gameinfo"));
                     if (!readTrackInformation(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/ViGaMuP/" + musicExtension + "/" + gameName + ".trackinfo"))) {
                         trackInformationAvailable = false;
                     }
-                    break;
-                case Constants.PLATFORM.TRACKERS:
-                    this.musicFileC = this.musicFileC+"."+trackerFileExtension;
                     break;
             }
 
@@ -111,6 +108,8 @@ public class Game {
     }
 
     public boolean readTrackInformation(File trackInfoFile){
+
+        Log.d(LOG_TAG, "trackinfoFile: " +trackInfoFile);
         Scanner s;
         int track = 0;
         int length = 0;
@@ -169,6 +168,7 @@ public class Game {
                 repeatable = false;
             }
             // Messy way to add tracks which should be played according to gameinfo but are not in trackinfo...
+            Log.d(LOG_TAG, "tracklist: " + trackList.toString());
             List<Integer> trackListCopy = new ArrayList<>(trackList);
 
             for (Integer trackInt:addedTracks){
@@ -199,6 +199,7 @@ public class Game {
     }
 
     private boolean readGameInfo(File gameInfoFile){
+        Log.d(LOG_TAG, "gameinfoFile: " +gameInfoFile);
         ArrayList<String> sInfo = new ArrayList<>();
         try {
 
@@ -427,19 +428,17 @@ public class Game {
             case Constants.PLATFORM.KSS:
             case Constants.PLATFORM.OTHERS:
             case Constants.PLATFORM.NSF:
-            case Constants.PLATFORM.TRACKERS:
                 Log.d("ViGaMuP nieuw", "filename: " +musicFileC);
                 return musicFileC;
             case Constants.PLATFORM.SPC:
             case Constants.PLATFORM.VGM:
                 return Constants.vigamupDirectory+"tmp/"+trackInformation.get(position).getFileName();
                 //return "/sdcard/Download/ViGaMuP/tmp/"+trackInformation.get(position).getFileName();
+            case Constants.PLATFORM.TRACKERS:
+                Log.d(LOG_TAG, "filename: " + Constants.vigamupDirectory +"/" + musicFileC + "/" + trackInformation.get(position).getFileName());
+                return musicFileC+"/"+trackInformation.get(position).getFileName();
         }
         return null;
-    }
-
-    private void addTrackerTrack(String trackFileName) {
-        trackInformation.add(new GameTrack(0, trackFileName.substring(0, 1).toUpperCase() + trackFileName.substring(1), 30, 0, true, 0, "/sdcard/Download/ViGaMuP/Trackers/" + trackFileName + ".xm"));
     }
 
     private void readInfoFromNSF(String gameName) {

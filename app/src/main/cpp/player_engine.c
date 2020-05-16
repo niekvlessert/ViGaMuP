@@ -13,12 +13,15 @@
 #include <SLES/OpenSLES_Android.h>
 #include <malloc.h>
 #include <tgmath.h>
+#include <dirent.h>
 
 
 #include "libkss/src/kssplay.h"
 #include "game-music-emu-0.6.0/gme/gme.h"
 #include "vgmplay/src/VGMPlay_Intf.h"
 #include "dumb/include/dumb.h"
+#include "dumb/include/internal/dumb.h"
+#include "dumb/include/internal/it.h"
 
 // engine interfaces
 static SLObjectItf engineObject = NULL;
@@ -133,7 +136,7 @@ typedef struct tick_context {
 TickContext g_ctx;
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "JNI onload!");
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "JNI onload!");
 
     JNIEnv* env;
     memset(&g_ctx, 0, sizeof(g_ctx));
@@ -152,7 +155,7 @@ void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
 {
     queueSecond = 1;
     generatingAllowed = 1;
-    //__android_log_print(ANDROID_LOG_INFO, "KSS", "Callback called!!");
+    //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Callback called!!");
 }
 
 int checkForSilence(int16_t* queueBuffer){
@@ -161,11 +164,11 @@ int checkForSilence(int16_t* queueBuffer){
         sum += queueBuffer[i];
     }
     if (sum != 0 && previousSum != sum) {
-        //__android_log_print(ANDROID_LOG_INFO, "KSS", "No silence... %ld, previous was %ld", sum, previousSum);
+        //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "No silence... %ld, previous was %ld", sum, previousSum);
         previousSum = sum;
         return 0;
     }
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Silence!!");
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Silence!!");
     previousSum=0;
     skipToNextTrack = 1; // for loop mode
     return 1;
@@ -182,9 +185,9 @@ int queueSecondIfRequired(void *context){
                     a++;
                     sum += fullTrackWavebuf[i];
                 }
-                __android_log_print(ANDROID_LOG_INFO, "KSS", "memory info at secondsplayed %d, position %d: sum %d", secondsPlayed, j, sum);
+                __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "memory info at secondsplayed %d, position %d: sum %d", secondsPlayed, j, sum);
             }*/
-            __android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second! %d", secondsPlayed);
+            __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "queuing a second! %d", secondsPlayed);
             memcpy(queueBuffer1, &fullTrackWavebuf[secondsPlayed * deviceSampleRate * 2], deviceSampleRate*4);
             memcpy(queueBufferSilence, (int8_t *) &fullTrackWavebuf[secondsPlayed * deviceSampleRate], deviceSampleRate);
             queueSecond = 0;
@@ -196,7 +199,7 @@ int queueSecondIfRequired(void *context){
             } // force next track for normal playback
         } else {
             if (queueBufferToUse == 2 && queueSecond != 0) {
-                __android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second 2 ! %d", secondsPlayed);
+                __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "queuing a second 2 ! %d", secondsPlayed);
                 memcpy(queueBuffer2, &fullTrackWavebuf[secondsPlayed * deviceSampleRate * 2], deviceSampleRate*4);
                 //if (checkForSilence(queueBuffer2)) nextTrack(context);
                 (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer2, deviceSampleRate*4);
@@ -205,7 +208,7 @@ int queueSecondIfRequired(void *context){
                 secondsPlayed++;
             } else {
                 if (queueBufferToUse == 3 && queueSecond != 0) {
-                    __android_log_print(ANDROID_LOG_INFO, "KSS", "queuing a second 3! %d", secondsPlayed);
+                    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "queuing a second 3! %d", secondsPlayed);
                     memcpy(queueBuffer3, &fullTrackWavebuf[secondsPlayed * deviceSampleRate * 2], deviceSampleRate*4);
                     //if (checkForSilence(queueBuffer3)) nextTrack(context);
                     (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, queueBuffer3, deviceSampleRate*4);
@@ -227,9 +230,9 @@ void* generateAudioThread(void* context){
     jint res = (*javaVM)->GetEnv(javaVM, (void**)&env, JNI_VERSION_1_6);
     if (res != JNI_OK) {
         res = (*javaVM)->AttachCurrentThread(javaVM, &env, NULL);
-        __android_log_print(ANDROID_LOG_INFO, "KSS", "Attaching!!");
+        __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Attaching!!");
         if (JNI_OK != res) {
-            __android_log_print(ANDROID_LOG_INFO, "KSS", "Failed to AttachCurrentThread, ErrorCode = %d", res);
+            __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Failed to AttachCurrentThread, ErrorCode = %d", res);
         }
     }
     jmethodID nextTrackId = (*env)->GetMethodID(env, pctx->PlayerServiceClz, "nextTrack", "()V");
@@ -263,7 +266,7 @@ void* generateAudioThread(void* context){
                         secondsPlayed = 2;
                         if (secondsToGenerate < secondsToSkipWhenCopyingToBuffer) secondsToGenerate = 0;
                         else secondsToGenerate = secondsToGenerate - secondsToSkipWhenCopyingToBuffer;
-                        __android_log_print(ANDROID_LOG_INFO, "KSS", "in copy initial data, secondsToGenerate: %d", secondsToGenerate);
+                        __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "in copy initial data, secondsToGenerate: %d", secondsToGenerate);
 
                     }*/
                     if (secondsToGenerate>0) {
@@ -278,13 +281,13 @@ void* generateAudioThread(void* context){
                         if (activeGameType == MUSIC_TYPE_VGM) {
                             pthread_mutex_lock(&lock);
                             FillBuffer(&fullTrackWavebuf[(trackLength - secondsToGenerate) *deviceSampleRate * 2], deviceSampleRate);
-                            __android_log_print(ANDROID_LOG_INFO, "KSS", "Creating vgm data...");
+                            __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Creating vgm data...");
                             pthread_mutex_unlock(&lock);
                         }
 
                         if (activeGameType == MUSIC_TYPE_TRACKERS) {
                             pthread_mutex_lock(&lock);
-                            __android_log_print(ANDROID_LOG_INFO, "KSS", "Creating tracker data...");
+                            //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Creating tracker data... secondsToGenerate: %i, trackLength: %i ", secondsToGenerate, trackLength);
                             duh_render_int(streamer.renderer, &streamer.sig_samples,&streamer.sig_samples_size, settings.bits, settings.is_unsigned, settings.volume,streamer.delta, deviceSampleRate, &fullTrackWavebuf[(trackLength - secondsToGenerate) * deviceSampleRate * 2]);
                             //duh_render_int(streamer.renderer, &streamer.sig_samples,&streamer.sig_samples_size, settings.bits, settings.is_unsigned, settings.volume,streamer.delta, deviceSampleRate, wavebuf);
                             pthread_mutex_unlock(&lock);
@@ -309,9 +312,9 @@ void* generateAudioThread(void* context){
                         (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, setSeekBarThumbProgressId);
                 }
                 isBuffering = 0;
-               // __android_log_print(ANDROID_LOG_INFO, "KSS", "next maybe?! isPlaying %d nextMessageSend %d SecondsPlayed %d tracklength %d nexttrackid %d", isPlaying,nextMessageSend, secondsPlayed, trackLength, nextTrackId);
+               // __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "next maybe?! isPlaying %d nextMessageSend %d SecondsPlayed %d tracklength %d nexttrackid %d", isPlaying,nextMessageSend, secondsPlayed, trackLength, nextTrackId);
                 if (isPlaying && !nextMessageSend && secondsPlayed +1 == trackLength && trackLength != 0) {
-                    __android_log_print(ANDROID_LOG_INFO, "KSS", "yep, next!!!");
+                    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "yep, next!!!");
                     sleep(1);
                     (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, nextTrackId);
 
@@ -326,7 +329,7 @@ void* generateAudioThread(void* context){
                         if (queueSecond) {
                             queueSecond = 0;
                             if (skipToNextTrack) {
-                                __android_log_print(ANDROID_LOG_INFO, "KSS", "Skip to next called...");
+                                __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Skip to next called...");
                                 skipToNextTrack = 0;
                                 (*env)->CallVoidMethod(env, pctx->PlayerServiceObj, nextTrackId);
                                 break;
@@ -366,13 +369,13 @@ void* generateAudioThread(void* context){
         }
         usleep (500);
         /*if (a==10000) {
-            __android_log_print(ANDROID_LOG_INFO, "KSS", "In thread... isplaying: %d secondstogenerate: %d generatingallowed: %d secondsplayed: %d tracklength: %d terminatethread: %d", isPlaying, secondsToGenerate, generatingAllowed,
+            __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "In thread... isplaying: %d secondstogenerate: %d generatingallowed: %d secondsplayed: %d tracklength: %d terminatethread: %d", isPlaying, secondsToGenerate, generatingAllowed,
                                 secondsPlayed, trackLength, terminateThread);
             a=0;
         }
         a++;*/
         if (terminateThread==1) {
-            __android_log_print(ANDROID_LOG_INFO, "KSS", "terminating thread");
+            __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "terminating thread");
             (*javaVM)->DetachCurrentThread(javaVM);
             threadTerminated=1;
             pthread_exit(NULL);
@@ -387,7 +390,7 @@ void Java_nl_vlessert_vigamup_PlayerService_setProgress(JNIEnv* env, jclass claz
 }
 
 jboolean Java_nl_vlessert_vigamup_PlayerService_togglePlayback(JNIEnv* env, jclass clazz) {
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Paused status!!: %d", isPaused);
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Paused status!!: %d", isPaused);
     if (isPaused) {
         (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
         isPaused = 0;
@@ -400,7 +403,7 @@ jboolean Java_nl_vlessert_vigamup_PlayerService_togglePlayback(JNIEnv* env, jcla
 }
 
 void Java_nl_vlessert_vigamup_PlayerService_pausePlayback(JNIEnv* env, jclass clazz) {
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Pause playback");
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Pause playback");
     if (!isPaused) {
         (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PAUSED);
         isPaused = 1;
@@ -408,7 +411,7 @@ void Java_nl_vlessert_vigamup_PlayerService_pausePlayback(JNIEnv* env, jclass cl
 }
 
 void Java_nl_vlessert_vigamup_PlayerService_resumePlayback(JNIEnv* env, jclass clazz) {
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Resume playback");
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Resume playback");
     if (isPaused) {
         (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
         isPaused = 0;
@@ -416,14 +419,14 @@ void Java_nl_vlessert_vigamup_PlayerService_resumePlayback(JNIEnv* env, jclass c
 }
 
 jboolean Java_nl_vlessert_vigamup_PlayerService_toggleLoopTrack(JNIEnv* env, jclass clazz) {
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Pause status!!: %d", isPaused);
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Pause status!!: %d", isPaused);
     if (loopTrack) {
         loopTrack = 0;
-        //__android_log_print(ANDROID_LOG_INFO, "KSS", "Looping uit!!");
+        //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Looping uit!!");
         return 0;
     } else {
         loopTrack = 1;
-        //__android_log_print(ANDROID_LOG_INFO, "KSS", "Looping aan!!");
+        //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Looping aan!!");
         return 1;
     }
 }
@@ -456,12 +459,12 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
 
     if (isPlaying || firstRun) {
         firstRun = 0;
-        __android_log_print(ANDROID_LOG_INFO, "KSS", "Ok, still playing...");
+        __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Ok, still playing...");
 
         isPlaying=0;
         //if (isBuffering==1) secondsToSkipWhenCopyingToBuffer = 1; // ugly fix for weird queue problem... probably some timing issue, can't find it...
         while (isBuffering){
-            __android_log_print(ANDROID_LOG_INFO, "KSS", "Still buffering...");
+            __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Still buffering...");
             usleep(100);
         }
 
@@ -469,7 +472,7 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
 
         SLresult result = (*bqPlayerBufferQueue)->Clear(bqPlayerBufferQueue);
         if (SL_RESULT_SUCCESS != result) {
-            __android_log_print(ANDROID_LOG_INFO, "KSS", "Clear failed, result=%d\n", result);
+            __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Clear failed, result=%d\n", result);
             return;
         }
 
@@ -480,10 +483,10 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
                         KSSPLAY_delete(kssplay);
                         KSS_delete(kss);
                     }
-                    //__android_log_print(ANDROID_LOG_INFO, "KSS", "Loading KSS... %s", utf8File);
+                    //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Loading KSS... %s", utf8File);
 
                     if ((kss = KSS_load_file(utf8File)) == NULL) {
-                        __android_log_print(ANDROID_LOG_INFO, "KSS", "Error loading... KSS...");
+                        __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Error loading... KSS...");
                         return;
                     }
                     kssplay = KSSPLAY_new(deviceSampleRate, 2, 16); // so frequency (48k) * channels (1) * bitrate (16) = 96000 bytes per second
@@ -522,14 +525,14 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
                 settings.delay = 0.0f;
                 settings.quality = DUMB_RQ_CUBIC;
 
-                __android_log_print(ANDROID_LOG_INFO, "PlayerEngine", "Loading %s.xm", utf8File);
+                __android_log_print(ANDROID_LOG_INFO, "PlayerEngine", "Loading %s", utf8File);
 
                 memset(&streamer, 0, sizeof(streamer_t));
                 dumb_register_stdfiles();
                 streamer.src = dumb_load_any(utf8File, 0, 0);
                 streamer.renderer =
                         duh_start_sigrenderer(streamer.src, 0, settings.n_channels, 0);
-                streamer.delta = 65536.0f / settings.freq;
+                streamer.delta = 65536.0f / deviceSampleRate;
                 streamer.bufsize = 4096 * (settings.bits / 8) * settings.n_channels;
 
         }
@@ -537,7 +540,7 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
         //pthread_mutex_unlock(&lock);
 
         if (fullTrackWavebuf!=NULL) free(fullTrackWavebuf);
-        __android_log_print(ANDROID_LOG_INFO, "KSS", "Free werkt ook nog... %s", utf8File);
+        __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Free werkt ook nog... %s", utf8File);
     }
 
     initialDataCopied = 0;
@@ -554,7 +557,7 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
     globalTrackNumber = trackNr;
 
     /*if (!isPaused || nextMessageSend) {
-        __android_log_print(ANDROID_LOG_INFO, "KSS", "Oe activating playing again... %s", utf8File);
+        __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Oe activating playing again... %s", utf8File);
         pthread_mutex_lock(&lock);
         (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
         nextMessageSend = 0;
@@ -565,14 +568,14 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
 
     switch (musicType) {
         case 0:
-            //__android_log_print(ANDROID_LOG_INFO, "KSS", "Gaat volgende track zetten in... %s", utf8File);
+            //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Gaat volgende track zetten in... %s", utf8File);
 
             KSSPLAY_reset(kssplay, globalTrackNumber, 0);
             secondsToGenerate = globalSecondsToPlay;
             if (globalSecondsToPlay==1) globalSecondsToPlay=3;
             trackLength = globalSecondsToPlay;
 
-            //__android_log_print(ANDROID_LOG_INFO, "KSS", "Gaat calculaten... %s", utf8File);
+            //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Gaat calculaten... %s", utf8File);
             KSSPLAY_calc(kssplay, wavebuf, deviceSampleRate);
             KSSPLAY_calc(kssplay, wavebuf2, deviceSampleRate);
             break;
@@ -610,7 +613,7 @@ void Java_nl_vlessert_vigamup_PlayerService_playTrack(JNIEnv* env, jclass clazz,
         case 4:
             run = true;
             //trackLength=round(duh_get_length(streamer.src)/65535);
-            trackLength=90;
+            trackLength=secondsToPlay;
             __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_Glue", "Track length %d\n", trackLength);
             //*buffer = malloc(streamer.bufsize);
 
@@ -690,7 +693,7 @@ void Java_nl_vlessert_vigamup_PlayerService_createEngine(JNIEnv* env, jobject in
     fullTrackWavebuf = NULL;
 
     wavebuf = malloc(deviceSampleRate * 2 * sizeof(int16_t));
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "wavebuf size: %d", deviceSampleRate * 2 * sizeof(int16_t));
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "wavebuf size: %d", deviceSampleRate * 2 * sizeof(int16_t));
     wavebuf2 = malloc(deviceSampleRate * 2 * sizeof(int16_t));
 }
 
@@ -698,7 +701,7 @@ void Java_nl_vlessert_vigamup_PlayerService_createEngine(JNIEnv* env, jobject in
 void Java_nl_vlessert_vigamup_PlayerService_createBufferQueueAudioPlayer(JNIEnv* env,
                                                                            jclass clazz, jint sampleRate, jint bufSize) {
 
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Creating the stuff...");
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Creating the stuff...");
 
     deviceSampleRate = sampleRate;
 
@@ -808,7 +811,7 @@ void Java_nl_vlessert_vigamup_PlayerService_createBufferQueueAudioPlayer(JNIEnv*
 // shut down the native audio system
 void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
 {
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown!!!");
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Shutdown!!!");
 
     //(*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_STOPPED);
     //SLresult result = (*bqPlayerBufferQueue)->Clear(bqPlayerBufferQueue);
@@ -824,7 +827,7 @@ void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
         bqPlayerVolume = NULL;
     }
 
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown2!!!");
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Shutdown2!!!");
 
     // destroy output mix object, and invalidate all associated interfaces
     if (outputMixObject != NULL) {
@@ -832,7 +835,7 @@ void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
         outputMixObject = NULL;
     }
 
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown3!!!");
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Shutdown3!!!");
 
     // destroy engine object, and invalidate all associated interfaces
     if (engineObject != NULL) {
@@ -841,7 +844,7 @@ void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
         engineEngine = NULL;
     }
 
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown4!!!");
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Shutdown4!!!");
 
     terminateThread = 1;
     while (!threadTerminated) {
@@ -855,11 +858,11 @@ void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
     free (queueBuffer2);
     free (queueBuffer3);
     free (queueBufferSilence);
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown5!!!");
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Shutdown5!!!");
 
     KSSPLAY_delete(kssplay);
     KSS_delete(kss);
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown6!!!");
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Shutdown6!!!");
 
     secondsToGenerate = 0;
     trackLength = 0;
@@ -880,7 +883,7 @@ void Java_nl_vlessert_vigamup_PlayerService_shutdown(JNIEnv* env, jclass clazz)
 
 
     pthread_mutex_destroy(&lock);
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Shutdown7!!!");
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Shutdown7!!!");
 
 }
 
@@ -896,10 +899,10 @@ void investigateTrackFurther(int tracknr){
     // non loop song: detect silence
     while (1){
         KSSPLAY_calc(kssplay, tempWavebuf, 48000);
-        //__android_log_print(ANDROID_LOG_INFO, "KSS", "Calculated %d...\n", secondsCalculated);
+        //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Calculated %d...\n", secondsCalculated);
         if (secondsCalculated>0){
             if (memcmp(generateWavebuf, tempWavebuf, 44100)==0) {
-                __android_log_print(ANDROID_LOG_INFO, "KSS", "Loop detected in %d on second %d!!\n", tracknr, secondsCalculated);
+                __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Loop detected in %d on second %d!!\n", tracknr, secondsCalculated);
                 break;
             }
         }
@@ -908,7 +911,7 @@ void investigateTrackFurther(int tracknr){
         f =  fopen(fn, "wb");
         fwrite (tempWavebuf, 1, 96000, f);
         fclose(f);
-        __android_log_print(ANDROID_LOG_INFO, "KSS", "Calculated %d...\n", secondsCalculated);
+        __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Calculated %d...\n", secondsCalculated);
         secondsCalculated++;
         if (secondsCalculated==50) break;
     }
@@ -917,8 +920,9 @@ void investigateTrackFurther(int tracknr){
     fclose (f);
 }
 
+// some function to generate music track by detecting silence in a kss track... doesn't work well, what about sound effects, noise or double tracks...
 void Java_nl_vlessert_vigamup_PlayerService_generateTrackInformation(JNIEnv* env, jclass clazz){
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "Generating trackinformation... \n");
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Generating trackinformation... \n");
     int16_t *tempWavebuf;
     int16_t *tempWavebuf2;
     int16_t *tempWavebuf3;
@@ -929,17 +933,17 @@ void Java_nl_vlessert_vigamup_PlayerService_generateTrackInformation(JNIEnv* env
         tempWavebuf3 = malloc (96000); // 1 second
         int i = 72;
         KSSPLAY_reset(kssplay, i, 0);
-        //__android_log_print(ANDROID_LOG_INFO, "KSS", "Checking track %d\n", i);
+        //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Checking track %d\n", i);
         KSSPLAY_calc(kssplay, tempWavebuf, 48000);
         int sum = 0, j = 0;
         for (j = 0; j < 44100; ++j) {
             sum += tempWavebuf[j];
         }
         if (sum != 0) {
-            //__android_log_print(ANDROID_LOG_INFO, "KSS", "Sound detected in track %d (%d)\n", i, sum);
+            //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Sound detected in track %d (%d)\n", i, sum);
             KSSPLAY_calc(kssplay, tempWavebuf2, 48000);
             if (memcmp(tempWavebuf, tempWavebuf2, 96000)!=0){
-                //__android_log_print(ANDROID_LOG_INFO, "KSS", "Sound found in track %d; second 1 == second 2, probably sfx...\n", i);
+                //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Sound found in track %d; second 1 == second 2, probably sfx...\n", i);
             //} else {
                 KSSPLAY_calc(kssplay, tempWavebuf3, 48000);
                 KSSPLAY_calc(kssplay, tempWavebuf3, 48000);
@@ -952,18 +956,18 @@ void Java_nl_vlessert_vigamup_PlayerService_generateTrackInformation(JNIEnv* env
                     sum += tempWavebuf3[j];
                     /*if (j == 1000 || j == 44099){
                         //if (!printedBefore) {
-                            __android_log_print(ANDROID_LOG_INFO, "KSS", "add, waarde %d positie %d\n", sum, j);
+                            __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "add, waarde %d positie %d\n", sum, j);
                             //printedBefore=1;
                         //}
                     }*/
                 }
                 if (sum != 0) {
-                    __android_log_print(ANDROID_LOG_INFO, "KSS", "Sound found in track %d, sum of generated 5th second = %d; should be music!!...\n", i, sum);
+                    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Sound found in track %d, sum of generated 5th second = %d; should be music!!...\n", i, sum);
                     investigateTrackFurther(i);
                 }
             }
         //} else {
-            //__android_log_print(ANDROID_LOG_INFO, "KSS", "Empty track... skipping %d\n",i);
+            //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "Empty track... skipping %d\n",i);
         }
         free (tempWavebuf);
         free (tempWavebuf2);
@@ -971,13 +975,10 @@ void Java_nl_vlessert_vigamup_PlayerService_generateTrackInformation(JNIEnv* env
     //}
 }
 
-
-//jstring Java_nl_vlessert_vigamup_PlayerService_generateSpcTrackInformation(JNIEnv* env, jclass clazz, char *file) {
 jbyteArray Java_nl_vlessert_vigamup_PlayerService_generateSpcTrackInformation(JNIEnv* env, jclass clazz, char *file) {
     const char *utf8File = (*env)->GetStringUTFChars(env, file, NULL);
     char fullPath[1024];
     char spcInfoString[1024];
-    //jchar *spcInfoString;
     char length[5];
     char loopLength[5];
     int doThisTrack = 0;
@@ -986,7 +987,7 @@ jbyteArray Java_nl_vlessert_vigamup_PlayerService_generateSpcTrackInformation(JN
 
     strcpy (fullPath, "/sdcard/Download/ViGaMuP/tmp/");
     strcat (fullPath, utf8File);
-    //__android_log_print(ANDROID_LOG_INFO, "KSS", "fullpath: %s",fullPath);
+    //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "fullpath: %s",fullPath);
 
     handle_error( gme_open_file(fullPath, &emu, gme_info_only ) );
     gme_info_t* info;
@@ -1001,14 +1002,14 @@ jbyteArray Java_nl_vlessert_vigamup_PlayerService_generateSpcTrackInformation(JN
     strcat (spcInfoString, info->copyright);
     strcat (spcInfoString, ";");
 
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "length: %ld, intro_length: %ld, loop_length: %ld",(long)info->length,(long)info->intro_length,(long)info->loop_length);
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "length: %ld, intro_length: %ld, loop_length: %ld",(long)info->length,(long)info->intro_length,(long)info->loop_length);
     sprintf (length, "%ld", (long) info->length/1000);
     strcat (spcInfoString, length);
     strcat (spcInfoString, ";");
     sprintf (loopLength, "%ld", (long) info->loop_length/1000);
     strcat (spcInfoString, loopLength);
     if ((info->length/1000)>4) doThisTrack = 1; else doThisTrack = 0;
-    __android_log_print(ANDROID_LOG_INFO, "KSS", "length: %d",doThisTrack);
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "length: %d",doThisTrack);
 
     gme_free_info( info );
     (*env)->ReleaseStringUTFChars(env, file, utf8File);
@@ -1025,18 +1026,134 @@ jbyteArray Java_nl_vlessert_vigamup_PlayerService_generateSpcTrackInformation(JN
     }
     //free (fullPath);
     //free (spcInfoString);
-
 }
 
-jbyteArray Java_nl_vlessert_vigamup_PlayerService_generateTrackerTrackInformation(JNIEnv* env, jclass clazz, char *file) {
+static int loop_count = 1;
 
-    const char *utf8File = (*env)->GetStringUTFChars(env, file, NULL);
+
+static int loop_callback(void *data) {
+    (void)data;
+    return --loop_count <= 0;
+}
+
+
+
+jbyteArray Java_nl_vlessert_vigamup_PlayerService_generateTrackerTrackInformation(JNIEnv* env, jclass clazz, char *path) {
+
+    const char *utf8File = (*env)->GetStringUTFChars(env, path, NULL);
+
     char fullPath[1024];
-    char trackerInfoString[1024];
+    char fullPathAndFileName[1024];
+
+    char trackerInfoString[4096];
+    long tracker_length;
     char length[5];
-    char loopLength[5];
-    int doThisTrack = 0;
+    //const char *tracker_title;
+
+    DIR* FD;
+    struct dirent* in_file;
+
+    memset(&streamer, 0, sizeof(streamer_t));
+    memset(&settings, 0, sizeof(settings_t));
+
+    settings.freq = deviceSampleRate;
+    settings.n_channels = 2;
+    settings.bits = 16;
+    settings.endianness = DUMB_LITTLE_ENDIAN;
+    settings.is_unsigned = false;
+    settings.volume = 1.0f;
+    settings.delay = 0.0f;
+    settings.quality = DUMB_RQ_CUBIC;
+
     jbyteArray Array;
-    Array = (*env)->NewByteArray(env, 1024);
-}
+    Array = (*env)->NewByteArray(env, 32768);
+
+    int i;
+    // for all supported files in the directory
+      // fetch length
+      // fetch title
+      // put info in the array: track_nr, name, length,,,filename
+    // write to file
+
+    strcpy (fullPath, "/sdcard/Download/ViGaMuP/");
+    strcat (fullPath, utf8File);
+    strcat (fullPath, "/");
+
+    dumb_register_stdfiles();
+
+    __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "fullpath: %s",fullPath);
+
+    if (NULL == (FD = opendir (fullPath)))
+    {
+        fprintf(stderr, "Error : Failed to open input directory\n");
+
+        return 1; // todo: return empty array
+    }
+
+    strcpy (trackerInfoString,"");
+    while ((in_file = readdir(FD))) {
+
+        if (!strcmp(in_file->d_name, "."))
+            continue;
+        if (!strcmp(in_file->d_name, ".."))
+            continue;
+        memset(&streamer, 0, sizeof(streamer_t));
+        //strcpy(fullPathAndFileName, "/sdcard/Download/ViGaMuP/");
+        //strcat(fullPathAndFileName, utf8File);
+        //strcat(fullPathAndFileName, "/");
+        strcpy(fullPathAndFileName, fullPath);
+        strcat(fullPathAndFileName, in_file->d_name);
+        __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "file to open...: %s",
+                            fullPathAndFileName);
+
+        streamer.src = dumb_load_any(fullPathAndFileName, 0, 0);
+
+        if (!streamer.src) {
+            fprintf(stderr, "Unable to load file %s for playback!\n", in_file->d_name);
+        }
+        //strcat(trackerInfoString, in_file->d_name);
+        //strcat(trackerInfoString, ",,,");
+
+        tracker_length = duh_get_length(streamer.src) / 65536;
+        __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "tracker_length...: %ld",
+                            tracker_length);
+        sprintf (length, "%ld", (long) tracker_length);
+        strcat (trackerInfoString, length);
+
+        /*tracker_title = duh_get_tag(streamer.src, "TITLE");
+        __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "title...: %s",
+                            tracker_title);*/
+
+        strcat (trackerInfoString, ";");
+        unload_duh(streamer.src);
+
+        //streamer.renderer = duh_start_sigrenderer(streamer.src, 0, settings.n_channels, 0);
+        //DUMB_IT_SIGRENDERER *itsr = duh_get_it_sigrenderer(streamer.renderer);
+        //dumb_it_set_loop_callback(itsr, loop_callback, NULL);
+        //xdumb_it_set_xm_speed_zero_callback(itsr, &dumb_it_callback_terminate, NULL);
+
+        //amount_of_tags = duh_get_tag_iterator_size(streamer.src);
+        //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "amount of tags...: %i",
+         //                   amount_of_tags);
+
+        /*for (i = 0; i < streamer.src->n_tags; i++){
+            __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "tag %i...: %s",
+                                i, streamer.src->tag[i][1]);;
+         }
+
+        sigdata = duh_get_it_sigdata(streamer.src);
+        __android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "message...: %s", dumb_it_sd_get_sample_name(sigdata, 0));
+*/
+
+
+        //sprintf (length, "%ld", (long) tracker_length);
+        //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "length...: %ld",length);
+        //strcat (trackerInfoString, tracker_length);
+        //__android_log_print(ANDROID_LOG_INFO, "ViGaMuP_player_engine", "lengths...: %s",trackerInfoString);
+
+    }
+    Array = (*env)->NewByteArray(env, strlen(trackerInfoString));
+    (*env)->SetByteArrayRegion(env, Array, 0, strlen(trackerInfoString), (jbyte*)trackerInfoString);
+    return Array;
+    }
 

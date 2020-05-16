@@ -10,7 +10,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-public class GameCollection{
+public class GameCollection {
     private int activeGame = 0;
     private ArrayList<Game> gameObjects;
     private ArrayList<Game> gameObjectsWithTrackInformation;
@@ -31,11 +31,12 @@ public class GameCollection{
         this.musicTypeToDisplay = musicType;
     }
 
-    public GameCollection(Context ctx){
+    public GameCollection(Context ctx) {
         this.ctx = ctx;
     }
 
-    private void searchForMusicTypeAndAddToListIfFound(String directory, String extension, int typeToAdd){
+    private void searchForMusicTypeAndAddToListIfFound(String directory, String extension, int typeToAdd) {
+        Log.d(LOG_TAG, "directory: " + directory + " - extension:" + extension + "typeToAdd: " + typeToAdd);
         File parentDir;
         File[] files;
         String[] strings;
@@ -43,21 +44,28 @@ public class GameCollection{
 
         parentDir = new File(directory);
         files = parentDir.listFiles();
-        if (files != null) {
-            for (File file : files) {
-                if (!extension.equals("")) {
-                    if (file.getName().endsWith(extension)) {
-                        strings = file.getName().split("\\.");
-                        Log.d(LOG_TAG,"wow "+strings[1]+" found...");
-                        gameObjects.add(new Game(strings[0], typeToAdd, 0, strings[1]));
-                        position++;
+        if (typeToAdd != 4) {
+            if (files != null) {
+                for (File file : files) {
+                    if (!extension.equals("")) {
+                        if (file.getName().endsWith(extension)) {
+                            strings = file.getName().split("\\.");
+                            Log.d(LOG_TAG, "wow " + strings[1] + " found...");
+                            gameObjects.add(new Game(strings[0], typeToAdd, 0, strings[1]));
+                            position++;
+                        }
                     }
-                } else {
-                    strings = file.getName().split("\\.");
-                    gameObjects.add(new Game(strings[0], typeToAdd, 0, strings[1]));
-                    Log.d(LOG_TAG,"wow2 "+strings[1]+" found...");
-                    position++;
                 }
+            }
+        } else {
+            for (File file : files) {
+                Log.d(LOG_TAG, "file: " + file);
+                if (file.isDirectory()) {
+                    Log.d(LOG_TAG, "wow some tracker directory found: " + file.getName());
+
+                    gameObjects.add(new Game(file.getName(), typeToAdd, 0, "Tracker"));
+                }
+                position++;
             }
         }
         if (position>0 && !foundMusicTypes.contains(typeToAdd)) {
@@ -77,11 +85,11 @@ public class GameCollection{
 
         gameObjectsWithTrackInformation = new ArrayList<>();
         gameObjectsWithoutTrackInformation = new ArrayList<>();
-        Log.d("vigamup", "hmm: " + gameObjects.size());
+        Log.d(LOG_TAG, "hmm: " + gameObjects.size());
         for (Game game : gameObjects){
             if (game.hasTrackInformationList()){
                 gameObjectsWithTrackInformation.add(game);
-                Log.d("KSS","adding: " + game.gameName + " " + game.position);
+                Log.d(LOG_TAG,"adding: " + game.gameName + " " + game.position);
             } else gameObjectsWithoutTrackInformation.add(game);
         }
         Collections.sort(gameObjectsWithTrackInformation, new GameCollectionTitleComperator());

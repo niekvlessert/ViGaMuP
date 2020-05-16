@@ -741,7 +741,7 @@ public class PlayerService extends Service{
                 //break;
         }
         Log.d(LOG_TAG,"In playCurrentTrack! info: " + game.getMusicType()+" "+game.getCurrentTrackFileNameFullPath()+" "+game.getCurrentTrackNumber()+" "+game.getCurrentTrackLength());
-        if (currentGame.getMusicType()!=Constants.PLATFORM.VGM) playTrack(game.getMusicType(), game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+        if (game.getMusicType()!=Constants.PLATFORM.VGM) playTrack(game.getMusicType(), game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackNumber(), game.getCurrentTrackLength());
 
         updateNotificationTitles();
         updateA2DPInfo();
@@ -788,7 +788,7 @@ public class PlayerService extends Service{
                     game.extractCurrentVgmTrackfromZipAndStartPlaybackWithCallback();
                     break;
             }
-            if (currentGame.getMusicType()!=Constants.PLATFORM.VGM) playTrack(game.getMusicType(), game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackNumber(), game.getCurrentTrackLength());
+            if (game.getMusicType()!=Constants.PLATFORM.VGM) playTrack(game.getMusicType(), game.getCurrentTrackFileNameFullPath(), game.getCurrentTrackNumber(), game.getCurrentTrackLength());
             alreadyPlaying = true;
         }
 
@@ -1017,6 +1017,6 @@ public class PlayerService extends Service{
 
     public native void generateTrackInformation();
     public native byte[] generateSpcTrackInformation(String spcFile);
-    public native byte[] generateTrackerTrackInformation(String trackerFile);
+    public native byte[] generateTrackerTrackInformation(String trackerPath);
 
 }

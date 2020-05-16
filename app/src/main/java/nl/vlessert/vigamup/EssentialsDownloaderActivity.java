@@ -118,8 +118,8 @@ public class EssentialsDownloaderActivity extends AppCompatActivity implements V
                                 path = path.concat("tmp/snes.zip");
                                 break;
                         case R.id.TRACKERS_1:
-                                download_Uri2 = Uri.parse("http://192.168.1.21/tracker_music_01.zip");
-                                path = path.concat("tmp/tracker.zip");
+                                download_Uri2 = Uri.parse("http://vlessert.nl/vigamup/tracker_music_01.zip");
+                                path = path.concat("tmp/tracker_music_01.zip");
                                 break;
                 }
                 request2 = new DownloadManager.Request(download_Uri2);

@@ -86,7 +86,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
 
     private TextView mResultTextView;
 
-    private ImageView gameLogoView;
+    //private ImageView gameLogoView;
     private ImageView trackListGameLogoView;
 
     private SlidingUpPanelLayout mLayout;
@@ -345,7 +345,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     setPlayButtonInPlayerBarForcePause();
                 }
                 if (intent.getAction().equals(DownloadManager.ACTION_DOWNLOAD_COMPLETE)){
-                    Log.d(LOG_TAG, "Download event!!: " + intent.getAction());
+                    Log.d(LOG_TAG, "Download completed event!!: " + intent.getAction());
                     unpackDownloadedFile(context, intent);
                 }
                 if (intent.getAction().equals("destroyAppAndService")){
@@ -623,14 +623,11 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     helpers.unzip(file, targetDirectory);
                     Log.d(LOG_TAG, "Unzipped...");
                     boolean deleted = file.delete();
-                    if (checkForMusicAndInitialize()) {
-                        forceRecreateGameCollection = true;
-                        showMusicList();
-                    }
-                    //recreate();
                 } catch (IOException test) {
                     Log.d(LOG_TAG, "Unzip error... very weird");
                 }
+                forceRefreshMusicList();
+
             }
             if (name.contains("snes")) {
                 Log.d(LOG_TAG, "snes essentials found");
@@ -664,78 +661,33 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                         }
                     }
                     file.delete();
-                    if (checkForMusicAndInitialize()) {
-                        forceRecreateGameCollection = true;
-                        showMusicList();
-                    }
-                    //recreate();
                 } catch (IOException test) {
                     Log.d(LOG_TAG, "Unzip error... very weird");
                 }
+                forceRefreshMusicList();
             }
             if (name.contains("tracker")) {
-                Log.d(LOG_TAG, "trackers essentials found");
-                int trackNr = 1;
 
-                try {
-                    //File targetDirectory = new File("/storage/emulated/0/Download/ViGaMuP/Trackers");
-                    File destinationFolder = new File(Constants.vigamupDirectory+"tmp/tracker_tmp");
+                String fileName = name.substring(name.lastIndexOf("/")+1,name.lastIndexOf("."));
+                Log.d(LOG_TAG, "trackers essentials found: " + fileName + " - " + name);
 
-                    if (helpers.directoryExists("tmp/tracker_tmp")){
-                        helpers.deleteAllFilesInDirectory(("tmp/tracker_tmp"));
-                    } else {
-                        helpers.makeDirectory("tmp/tracker_tmp");
-                    }
+                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                builder.setMessage("Gathering the titles and lengths from the tracks now in the background. This takes a while with tracker files... " +
+                        "Do NOT quit the application, you'll need to download the pack again if you do... " +
+                        "When done the player application will reload, the tracker files     should show...")
+                        .setCancelable(false)
+                        .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int id) {
+                            }
+                        });
+                AlertDialog alert = builder.create();
 
-                    helpers.unzip(file, destinationFolder);
-                    Log.d(LOG_TAG, "Unzipped in " + destinationFolder.toString());
+                alert.show();
 
-                    String trackerfileName, extension;
-                    for (int counter = 0; counter < helpers.extracted_files.size(); counter++) {
-                        trackerfileName = helpers.extracted_files.get(counter).toString();
-                        extension = trackerfileName.substring(trackerfileName.lastIndexOf(".")+1);
-                        Log.d(LOG_TAG, "filename: "+trackerfileName + ",extension: "+extension);
-
-                        byte[] buffer = new byte[30];
-                        InputStream is = new FileInputStream("/storage/emulated/0/Download/ViGaMuP/tmp/tracker_tmp/" + trackerfileName);
-                        String title;
-                        if (is.read(buffer) != buffer.length) {
-                            Log.d(LOG_TAG, "blaat");
-                        }
-                        title = new String(buffer);
-                        Log.d(LOG_TAG, "buffer:" + title);
-
-                        is.close();
-                        switch(extension){
-                            case "it":
-                                break;
-                            case "s3m":
-                                break;
-                            case "mod":
-                                break;
-                            case "xm":
-                                break;
-                            default:
-                                break;
-                        }
-                        int trackLength = 90;//fix
-                        String baseGameName = name.substring(name.lastIndexOf("/"),name.lastIndexOf("."));
-                        File trackinfoFile = new File(Constants.vigamupDirectory+"VGM/"+baseGameName+".trackinfo");
-                        FileWriter fWriter = new FileWriter(trackinfoFile, true);
-                        File gameinfoFile = new File(Constants.vigamupDirectory+"VGM/"+baseGameName+".gameinfo");
-                        FileWriter fWriter2 = new FileWriter(trackinfoFile, true);
-                        fWriter.write(Integer.toString(trackNr)+ "," + title.replace(",", "") + "," + trackLength + ",,," + trackerfileName + "\n");
-
-
-                        //create a txt file with filename, title, length from every file in there in Trackers directory. Filename similar to zip file but with .txt
-                        //Do we need c for that?
-
-                        //Remove tmp files and directory
-                    }
-                } catch (IOException test) {
-                    Log.d(LOG_TAG, "Unzip error... very weird");
-                }
+                Thread t = new Thread(new TrackerTrackInfoGenerator(mPlayerService, file, fileName, getApplicationContext(), this));
+                t.start();
             }
+
         }
         if (resultCode == 1337) { //normal download, can probably be deleted soon since camera function is gone. Have to move vgm stuff though
             Log.d(LOG_TAG, "Generating vgmrips gameinfo!!!");
@@ -750,10 +702,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                 e.printStackTrace();
             }
             recreate();
-            if (checkForMusicAndInitialize()) {
-                forceRecreateGameCollection = true;
-                showMusicList();
-            }
+            forceRefreshMusicList();
             return;
         }
         if (result != null) {
@@ -812,6 +761,13 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                     }
                 }
             }
+        }
+    }
+
+    public void forceRefreshMusicList() {
+        if (checkForMusicAndInitialize()) {
+            forceRecreateGameCollection = true;
+            showMusicList();
         }
     }
 
@@ -936,11 +892,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                             helpers.unzip(file, targetDirectory);
                             Log.d(LOG_TAG, "Unzipped...");
                             boolean deleted = file.delete();
-                            if (checkForMusicAndInitialize()) {
-                                forceRecreateGameCollection = true;
-                                showMusicList();
-                            }
-                            //recreate();
+                            forceRefreshMusicList();
                         } catch (IOException test) {
                             Log.d(LOG_TAG, "Unzip error... very weird");
                         }
@@ -974,10 +926,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                         t.start();
                         try { t.join(); } catch (InterruptedException e) { e.printStackTrace(); }
                         recreate();
-                        if (checkForMusicAndInitialize()) {
-                            forceRecreateGameCollection = true;
-                            showMusicList();
-                        }
+                        forceRefreshMusicList();
                     }
                     if (uri.contains("vgmrips") && uri.contains("zip")) { // should be vgmrips music...
                         Log.d(LOG_TAG, "Generating vgmrips gameinfo!!!");
@@ -991,10 +940,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
                             e.printStackTrace();
                         }
                         recreate();
-                        if (checkForMusicAndInitialize()) {
-                            forceRecreateGameCollection = true;
-                            showMusicList();
-                        }
+                        forceRefreshMusicList();
                     }
                 } else {
                     Log.i(LOG_TAG, "Download failed!");
@@ -1104,7 +1050,7 @@ public class MainActivity extends AppCompatActivity{ //implements GameList.OnGam
         gamePosition = position;
         if (position!=-1) game = gameCollection.getGameAtPosition(position);
         else game = gameCollection.getCurrentGame();
-        Log.d("KSS", "game " + game.getTitle());
+        Log.d (LOG_TAG, "game: " + game.getTitle());
         if (!currentShowedGameTitle.equals(game.getTitle())) {
             currentShowedGameTitle = game.getTitle();
 
