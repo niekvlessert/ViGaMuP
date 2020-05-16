@@ -7,8 +7,8 @@ android {
         applicationId "nl.vlessert.vigamup2"
         minSdkVersion 19
         targetSdkVersion 29
-        versionCode 12
-        versionName "1.74"
+        versionCode 13
+        versionName "1.75"
         multiDexEnabled true
         externalNativeBuild {
             cmake {
